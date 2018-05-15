@@ -65,23 +65,24 @@ def model():
         C2(32),
         C2(32),
         C2(16),
-        C2(4)
+        C2(4),
+        C2(1)
     ]
 
     def coarse_inference(x):
         return apply_sequence(coarse_architecture, x)
 
-    # Siamese subnetwork
-    full_input = Input(shape=(3,16,448,448),dtype='float32',name="full_input")
+    # Coarse network output
     cropped_input = Input(shape=(3,16,112,112),dtype='float32',name="cropped_input")
-    resized_input = Input(shape=(3,16,112,112),dtype='float32',name="resized_input")
-
     cropped_output = coarse_inference(cropped_input)
-    resized_output = coarse_inference(resized_input)
 
-    # Fine-tuning subnetwork
+
+    # Fine-tuned network output
+    resized_input = Input(shape=(3,16,112,112),dtype='float32',name="resized_input")
+    resized_output = coarse_inference(resized_input)
     take_last_frame = Lambda(lambda x: x[:,:,-1,:,:],output_shape = (3,448,448))
 
+    full_input = Input(shape=(3,16,448,448),dtype='float32',name="full_input")
     last_frame = take_last_frame(full_input)
     resized_output = UpSampling2D(size=(4,4),data_format=data_format)(
             resized_output)
