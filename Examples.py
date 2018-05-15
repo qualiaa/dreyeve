@@ -1,49 +1,40 @@
 #!/usr/bin/env python3
 
-import csv
-import math
-import os, os.path
 import random
-import re
-import sys
-import numpy as np
 from functools import reduce
 from glob import glob
-from itertools import accumulate
+from itertools import accumulate, islice
+from operator import add
+from pathlib import Path, PurePath
+from sys import maxsize as MAX_INT
 from warnings import warn
 
-import imageio
+import numpy as np
+from imageio.core.format import CannotReadFrameError
+from keras.utils import Sequence
 from pims import ImageIOReader as Reader
 from skimage.transform import resize
 
 from ShuffleQueue import ShuffleQueue
-from operator import add
+from random_crop_slice import random_crop_slice
+import eye_data
 
-DATA_DIR = "DREYEVE_DATA"
+from consts import *
 
-VIDEO_SHAPE=(1080,1920,3)
+class KerasSequenceWrapper(Sequence):
+    def __init__(self,batch_size,*args,**kargs):
+        self.batch_size = batch_size
+        self.examples = Examples(*args,**kargs)
 
-class Labels:
-    FIXATION = 0
-    SACCADE = 1
-    BLINK = 2
+    def __getitem__(self,batch_n):
+        i1,i2,i3,o1,o2 = self.examples.get_batch(self.batch_size,batch_n)
+        return ([i1,i2,i3],[o1,o2])
 
-LABEL_NAMES = { s:getattr(Labels,s) for s in Labels.__dict__.keys()
-        if not s.startswith("_")}
+    def __len__(self):
+        return self.examples.n_batches(self.batch_size)
 
-def _resize_frame_tensor(frame_tensor,target_shape):
-    target_shape=(frame_tensor.shape[0],*target_shape,frame_tensor.shape[-1])
-    return resize(frame_tensor,target_shape,anti_aliasing=True,mode='reflect')
-
-def _get_frame_tensor(video, frame_of_interest, num_frames=16):
-    """ return N stacked, resized frames from frame [I-N, I] """
-    foi = frame_of_interest
-    if foi < num_frames - 1:
-        raise IndexError("Frame of interest " + foi +
-                         " must have 15 preceding frames")
-    frame_slice = video[foi-num_frames+1:foi+1]
-    frame_tensor = np.stack(frame_slice, axis=0)
-    return frame_tensor
+    def on_epoch_end():
+        self.examples.example_queue.next_epoch()
 
 class Examples:
     def __init__(self,
@@ -53,9 +44,11 @@ class Examples:
                  seed=None):
         self.frames_per_example=frames_per_example
         self.example_shape=example_shape
+        print("Loading eye data...")
+        self.eye_positions = eye_data.read(folders)
         print("Loading video files...")
         self.videos = {
-                x: [Reader(os.path.join(folder, "garmin_resized_{:d}.avi".format(x)))
+                x: [Reader(str(Path(folder, "garmin_resized_{:d}.avi".format(x))))
                     for folder in folders]
                 for x in [112,448]}
         print("Done")
@@ -63,12 +56,14 @@ class Examples:
         self._lengths = list(accumulate(lengths))
         self.num_examples = reduce(add,lengths)
 
-        self.seed = seed or random.randrange(sys.maxsize)
+        self.seed = seed or random.randrange(MAX_INT)
         self.example_queue = ShuffleQueue(range(self.num_examples),self._rand)
-
 
     def __getitem__(self,n):
         return self.get_example(n)
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
         return self.next_example()
@@ -91,31 +86,53 @@ class Examples:
 
     def get_example(self, example_id):
         vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
-        if len(eye_positions[vid_id][frame]) == 0:
-            raise IndexError("Example has no ground truth")
+        eye_coords = self.eye_positions[vid_id][frame]
+
+        if len(eye_coords) == 0:
+            raise ValueError("Example has no ground truth")
+
         vid448 = self.videos[448][vid_id]
         vid112 = self.videos[112][vid_id]
 
         tensor = _get_frame_tensor(vid448,frame)
 
-        frame_shape = tensor.shape[1:3]
+        frame_shape = tensor.shape[2:4]
 
         crop_slice = random_crop_slice(frame_shape,
                 self.example_shape, self._rand)
 
-        tensor_cropped=tensor[[slice(None),*crop_slice,slice(None)]]
+        tensor_cropped = tensor[[slice(None),slice(None),*crop_slice]]
         tensor_resized = _get_frame_tensor(vid112,frame)
 
-
-        attention = get_scaled_attention_map(vid_id, frame, frame_shape)
+        attention = get_scaled_attention_map(eye_coords,frame_shape)
         attention_cropped = attention[crop_slice]
-        attention_resized = get_scaled_attention_map(vid_id, frame,
-                self.example_shape)
+        attention_resized = get_scaled_attention_map(eye_coords,self.example_shape)
 
-        return (tensor_cropped.astype(np.float32),
-                tensor_resized.astype(np.float32),
+        return (tensor,
+                tensor_cropped,
+                tensor_resized,
                 attention_cropped,
                 attention_resized)
+
+    def get_batch(self, batch_size, batch_n):
+        n_batches = self.n_batches(batch_size)
+        n_examples = len(self.example_queue.container)
+        if batch_n >= n_batches:
+            raise IndexError("Batch",batch_n,"exceeds number of batches",n_batches)
+        batch = []
+        i = batch_size*batch_n
+        while len(batch) < batch_size:
+            if i >= n_examples: 
+                raise IndexError("Batch",batch_n,"of",n_batches,"exceeded number of examples")
+            try:
+                batch.append(self.get_example(i))
+            except ValueError as e:
+                warn("Exception raised for example {:d}: {}".format(i, e.args),
+                     RuntimeWarning)
+            i += 1
+
+        batch = map(np.stack,zip(*batch))
+        return batch
 
     def next_example(self):
         example = None
@@ -125,10 +142,10 @@ class Examples:
                 example = self.get_example(example_id)
             except (ValueError, IndexError) as e:
                 warn("Exception raised for example {:d}: {}".format(
-                        example_id,e.args),
-                    RuntimeWarning)
+                         example_id, e.args),
+                     RuntimeWarning)
                 continue
-            except imageio.core.format.CannotReadFrameError:
+            except CannotReadFrameError:
                 warn("Exception raised for example {:d}: Corrupt frame".format(
                         example_id),
                     RuntimeWarning)
@@ -139,21 +156,25 @@ class Examples:
         return example
 
     def next_batch(self,batch_size):
-        examples=[]
-        for i in range(batch_size):
-            examples.append(self.next_example())
-            if len(self.example_queue) == 0:
-                break
+        batch=[]
 
-        examples = map(np.stack,zip(*examples))
+        if len(self.example_queue.container) < batch_size:
+            raise ValueError("Batch size",batch_size,"exceeds number of examples")
+        if len(self.example_queue) < batch_size:
+            self.example_queue.next_epoch()
+            return []
+
+        batch.extend(islice(iter(self),batch_size))
+        batch = map(np.stack,zip(*batch))
+
 
         return examples
 
     def n_batches(self,batch_size):
-        return len(self)//batch_size + 1
+        return len(self)//batch_size
 
     def _get_video_and_frame_number_from_id(self,example_id):
-        if i >= len(self):
+        if example_id >= len(self):
             raise IndexError("Example ID exceeds number of samples")
         start_id = 0
         for video_number, end_id in enumerate(self._lengths):
@@ -167,35 +188,21 @@ class Examples:
             start_id = end_id
         raise RuntimeError("Frame not found")
 
-video_folders = glob(DATA_DIR+"/[0-9][0-9]")
+def _resize_frame_tensor(frame_tensor,target_shape):
+    target_shape=(frame_tensor.shape[0],*target_shape,frame_tensor.shape[-1])
+    return resize(frame_tensor,target_shape,anti_aliasing=True,mode='reflect')
 
-from collections import defaultdict
-eye_positions = list()
+def _get_frame_tensor(video, frame_of_interest, num_frames=16):
+    """ return N stacked, resized frames from frame [I-N, I] """
+    foi = frame_of_interest
+    if foi < num_frames - 1:
+        raise IndexError("Frame of interest " + foi +
+                         " must have 15 preceding frames")
+    frame_slice = video[foi-num_frames+1:foi+1]
+    frame_tensor = np.stack(frame_slice, axis=0)
+    frame_tensor = np.transpose(frame_tensor,(3,0,1,2))
+    return frame_tensor.astype(np.float32)
 
-print("Reading eye position data...")
-for i,folder in enumerate(video_folders):
-    eye_pos = defaultdict(list)
-    with open(folder+"/etg_samples.txt") as f:
-        eye_data = csv.reader(f, delimiter=' ', dialect="unix")
-        next(eye_data) # skip csv header
-        for row in eye_data:
-            _, frame, x, y, label, _ = row
-            try:
-                label_id = LABEL_NAMES[label.upper()]
-            except KeyError:
-                continue
-            frame = int(frame)
-            coords = np.array([float(y),float(x)])
-            
-            if label_id != Labels.FIXATION: continue
-            if any(a > b for a,b in zip(coords,VIDEO_SHAPE)) or any(
-                    a < 0 or math.isnan(a) for a in coords):
-                continue
-            #eye_pos[frame].append((label_id, coords))
-            eye_pos[frame].append(coords)
-        eye_pos[frame]=np.array(eye_pos[frame])
-    eye_positions.append(eye_pos)
-print("Done")
 
 def _generate_attention_map(gt_coords, size):
     attention_map = np.zeros(size,dtype=np.float32)
@@ -211,33 +218,13 @@ def _generate_attention_map(gt_coords, size):
 
     return attention_map
 
-def _scale_gt_coords(coords, target_shape):
-    # calculate scale amount
-    source_shape=VIDEO_SHAPE[0:2]
-    if source_shape != target_shape:
-        #print("Input: {}".format(coords))
-        scale=np.array([t/s for s, t in zip(source_shape, target_shape)])
-        #print("Scale: {}".format(scale))
-        #coords=[(y*scale[0], x*scale[1]) for y, x in coords]
-        coords=coords*scale
-        """ print("Source shape: {}".format(source_shape))
-        print("Target shape: {}".format(target_shape))
-        print("Output: {}".format(coords)) """
-    return coords
-
-def get_scaled_attention_map(vid_id, frame, target_shape):
-    coords = eye_positions[vid_id][frame]
+def get_scaled_attention_map(eye_coords, target_shape):
     # remove non-fixations
-    if len(coords) == 0: raise ValueError("No coords for attention map")
+    if len(eye_coords) == 0: raise ValueError("No coords for attention map")
     # strip label string
-    coords=_scale_gt_coords(coords, target_shape)
-    attention_map=_generate_attention_map(coords, target_shape)
+    eye_coords=eye_data.scale_to_shape(eye_coords, target_shape)
+    attention_map=_generate_attention_map(eye_coords, target_shape)
     return attention_map
     
-
-def random_crop_slice(input_shape, target_shape,rand=random):
-    starts = [rand.randrange(s-c) for s,c in zip(input_shape, target_shape)]
-    slices = [slice(s, s+c) for s, c in zip(starts, target_shape)]
-    return slices
-
-training_examples = Examples(video_folders)
+#video_folders = glob(DATA_DIR+"/[0-9][0-9]")
+#training_examples = Examples(video_folders)
