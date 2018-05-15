@@ -1,74 +1,106 @@
 #!/usr/bin/env python3
 
+from functools import reduce
+
 from keras import backend as K
 from keras.layers import Conv2D, Conv3D, Flatten, Input, Reshape, Lambda, concatenate
-from keras.layers import MaxPooling3D, UpSampling2D
+from keras.layers import MaxPooling3D, UpSampling2D,UpSampling3D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 import keras.utils.vis_utils as vis
 
-from functools import reduce
+import pkl_xz
 
 apply = lambda f, x: f(x)
 def flip(f):
     return lambda a, b: f(b, a)
 apply_sequence = lambda l, x: reduce(flip(apply), l, x)
 
-data_format = "channels_last"
 
-C3 = lambda f: Conv3D(f,(3,3,3),data_format=data_format,activation="relu",padding="same")
-P3 = lambda: MaxPooling3D(data_format=data_format)
-C2 = lambda f: Conv2D(f,(3,3),data_format=data_format,padding="same")
-U2 = lambda: UpSampling2D(data_format=data_format)
+def model():
+    data_format = "channels_first"
 
-coarse_architecture = [
-    # encoder
-    C3(64), P3(),
-    C3(128), P3(),
-    C3(256), C3(256), P3(),
-    C3(512), C3(512), P3(),
-    # decoder
-    Reshape((512,7,7)),
-    C2(256), LeakyReLU(0.001), U2(),
-    C2(128), LeakyReLU(0.001), U2(),
-    C2(64),  LeakyReLU(0.001), U2(),
-    C2(32),  LeakyReLU(0.001), U2(),
-    C2(16),  LeakyReLU(0.001),
-    # missing U2 here?
-    C2(1), LeakyReLU(0.001)
-]
+    """
+    def inference(examples):
+        tensor = examples[0]
+        """
 
-C2 = lambda f: Conv2D(f,(3,3),data_format=data_format,activation="relu",padding="same")
-fine_architecture = [
-    C2(32),
-    C2(64),
-    C2(32),
-    C2(32),
-    C2(16),
-    C2(4)
-]
+    C3 = lambda filter_size: Conv3D(
+            filter_size,
+            (3, 3, 3),
+            data_format=data_format,
+            activation="relu",
+            padding="same")
+    def P3(shape=(2, 2, 2)):
+        return MaxPooling3D(
+            shape,
+            data_format=data_format)
+    C2 = lambda filter_size: Conv2D(
+            filter_size,
+            (3,3),
+            data_format=data_format,
+            padding="same")
+    U2 = lambda: UpSampling2D(data_format=data_format)
 
-def coarse_inference(x):
-    return apply_sequence(coarse_architecture, x)
+    coarse_architecture = [
+        # encoder                        #112, 16
+        C3(64), P3(),                    #56 , 8
+        C3(128), P3(),                   #28 , 4
+        C3(256), C3(256), P3(),          #14 , 2
+        C3(512), C3(512), P3(),          #7  , 1
+        # decoder
+        Reshape((512,7,7)),
+        C2(256), LeakyReLU(0.001), U2(), #14
+        C2(128), LeakyReLU(0.001), U2(), #28
+        C2(64),  LeakyReLU(0.001), U2(), #56
+        C2(32),  LeakyReLU(0.001), U2(), #112
+        C2(16),  LeakyReLU(0.001),
+        C2(1), LeakyReLU(0.001)
+    ]
 
-# Siamese subnetwork
-cropped_input = Input(shape=(3,16,112,112),dtype='float32',name="cropped_input")
-resized_input = Input(shape=(3,16,112,112),dtype='float32',name="resized_input")
+    C2 = lambda f: Conv2D(f,(3,3),data_format=data_format,activation="relu",padding="same")
+    fine_architecture = [
+        C2(32),
+        C2(64),
+        C2(32),
+        C2(32),
+        C2(16),
+        C2(4)
+    ]
 
-cropped_output = coarse_inference(cropped_input)
-resized_output = coarse_inference(resized_input)
+    def coarse_inference(x):
+        return apply_sequence(coarse_architecture, x)
 
-# Fine-tuning subnetwork
-take_last_frame = Lambda(lambda x: x[:,:,-1,:,:],output_shape = (3,112,112))
+    # Siamese subnetwork
+    full_input = Input(shape=(3,16,448,448),dtype='float32',name="full_input")
+    cropped_input = Input(shape=(3,16,112,112),dtype='float32',name="cropped_input")
+    resized_input = Input(shape=(3,16,112,112),dtype='float32',name="resized_input")
 
-last_frame = take_last_frame(resized_input)
+    cropped_output = coarse_inference(cropped_input)
+    resized_output = coarse_inference(resized_input)
 
-fine_input = concatenate([resized_output,last_frame],axis=1)
-fine_output = apply_sequence(fine_architecture, fine_input)
+    # Fine-tuning subnetwork
+    take_last_frame = Lambda(lambda x: x[:,:,-1,:,:],output_shape = (3,448,448))
 
-# Build model
-model = Model(inputs=[cropped_input,resized_input],
-              outputs=[resized_output,fine_output])
+    last_frame = take_last_frame(full_input)
+    resized_output = UpSampling2D(size=(4,4),data_format=data_format)(
+            resized_output)
 
-vis.plot_model(model,to_file="keras.png")
-model.summary()
+    fine_input = concatenate([last_frame,resized_output],axis=1)
+    fine_output = apply_sequence(fine_architecture, fine_input)
+
+    # Build model
+    model = Model(inputs=[full_input,cropped_input,resized_input],
+                  outputs=[cropped_output,fine_output])
+
+    c3d_params = pkl_xz.load("c3d_weights.pkl.xz")
+    pretrained_layers = [2,4,6,7,9,10]
+    for l, p in zip(pretrained_layers, c3d_params):
+        model.layers[l].trainable=False
+        model.layers[l].set_weights(p)
+    del c3d_params
+
+    print(model.summary())
+    model.compile(optimizer='adam',loss='mse')
+
+    return model
