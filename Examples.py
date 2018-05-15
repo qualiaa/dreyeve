@@ -106,7 +106,9 @@ class Examples:
 
         attention = get_scaled_attention_map(eye_coords,frame_shape)
         attention_cropped = attention[crop_slice]
-        attention_resized = get_scaled_attention_map(eye_coords,self.example_shape)
+        attention_resized = get_scaled_attention_map(eye_coords,(448,448))
+        attention_cropped = np.expand_dims(attention_cropped,0)
+        attention_resized = np.expand_dims(attention_resized,0)
 
         return (tensor,
                 tensor_cropped,
