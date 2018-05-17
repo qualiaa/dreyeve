@@ -4,10 +4,13 @@ from glob import glob
 
 import numpy as np
 import tensorflow as tf
+import warnings
 
 import network
 from Examples import KerasSequenceWrapper
 from DreyeveExamples import DreyeveExamples
+
+warnings.filterwarnings("ignore")
 
 print("Loading model...")
 model = network.model()
