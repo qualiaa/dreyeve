@@ -76,6 +76,10 @@ class DreyeveExamples(Examples):
             super().next_example()
         except CannotReadFrameError:
             warn("Corrupt frame", RuntimeWarning)
+        except Exception as e:
+            print("Video {}, frame {}".format(
+                *_get_video_and_frame_number_from_id(e.args[-1])))
+            raise e
 
 
     

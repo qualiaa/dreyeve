@@ -110,6 +110,7 @@ class Examples(ABC):
                 continue
             except Exception as e:
                 print("Exception raised for example {:d}".format(example_id))
+                e.args += [example_id]
                 raise e
 
         return example
