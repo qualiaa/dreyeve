@@ -100,7 +100,6 @@ def model():
         model.layers[l].set_weights(p)
     del c3d_params
 
-    print(model.summary())
     model.compile(optimizer='adam',loss='mse')
 
     return model
