@@ -30,17 +30,35 @@ class DreyeveExamples(Examples):
                     for folder in folders]
                 for x in [112,448]}
         print("Done")
-        lengths = list(map(len,self.videos[112]))
-        self._lengths = list(accumulate(lengths))
-        self.num_examples = reduce(add,lengths)
+        self._lengths = list(map(len,self.videos[112]))
+        self._cumulative_lengths = list(accumulate(self._lengths))
+        self.total_frames = reduce(add,self._lengths)
+        self.valid_indices = self._get_valid_indices()
 
+        eh = {}
+        eh[CannotReadFrameError] = lambda e, i: warn(
+            "Corrupt frame for video {:d}, frame {:d}".format(
+                *self._get_video_and_frame_number_from_id(i)),
+            RuntimeWarning)
+        eh[ValueError] = lambda e, i: warn(
+            "Exception handled for video {:d}, frame{:d}: {}".format(
+                *self._get_video_and_frame_number_from_id(i), e.args),
+            RuntimeWarning)
+        eh[IndexError] = eh[ValueError]
+        #self.exception_handlers = eh
         super().__init__(seed)
 
     def __len__(self):
-        return self.num_examples
+        return len(self.valid_indices)
     
     def get_example(self, example_id):
         vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
+
+        if frame+1 < self.frames_per_example:
+            raise IndexError(
+                    "Frame {} below frames_per_example "
+                    "for video {}".format(frame,vid_id))
+
         eye_coords = self.eye_positions[vid_id][frame]
 
         if len(eye_coords) == 0:
@@ -65,6 +83,18 @@ class DreyeveExamples(Examples):
         attention_cropped = np.expand_dims(attention_cropped,0)
         attention_resized = np.expand_dims(attention_resized,0)
 
+        # close reader
+        vid112.reader._close()
+        vid112.reader._pos = -101
+        vid448.reader._close()
+        vid448.reader._pos = -101
+        """
+        self.videos[448][vid_id] = Reader(vid448.filename)
+        self.videos[112][vid_id] = Reader(vid112.filename)
+        del vid112,vid448
+        """
+
+
         return ([tensor,
                 tensor_cropped,
                 tensor_resized],
@@ -73,31 +103,46 @@ class DreyeveExamples(Examples):
 
     def next_example(self):
         try:
-            super().next_example()
-        except CannotReadFrameError:
-            warn("Corrupt frame", RuntimeWarning)
+            result = super().next_example()
         except Exception as e:
             print("Video {}, frame {}".format(
-                *_get_video_and_frame_number_from_id(e.args[-1])))
+                *self._get_video_and_frame_number_from_id(e.args[-1])))
             raise e
+        return result
 
+    def get_batch(self, batch_size, batch_n):
+        try:
+            result = super().get_batch(batch_size, batch_n)
+        except Exception as e:
+            print("Video {}, frame {}".format(
+                *self._get_video_and_frame_number_from_id(e.args[-1])))
+            raise e
+        return result
 
-    
     def _get_video_and_frame_number_from_id(self,example_id):
-        if example_id >= len(self):
+        frame_id = self.valid_indices[example_id]
+        if frame_id >= self.total_frames:
             raise IndexError("Example ID exceeds number of samples")
         start_id = 0
-        for video_number, end_id in enumerate(self._lengths):
-            if end_id > example_id:
-                frame_number = example_id - start_id
-                if frame_number+1 < self.frames_per_example:
-                    raise IndexError(
-                            "Frame {} below frames_per_example "
-                            "for example id {}".format(frame_number,example_id))
+        for video_number, end_id in enumerate(self._cumulative_lengths):
+            if end_id > frame_id:
+                frame_number = frame_id - start_id
                 return video_number, frame_number
             start_id = end_id
         raise RuntimeError("Frame not found")
 
+    def _get_valid_indices(self):
+        num_vids = len(self.videos[112])
+        
+        indices = []
+        counter = 0
+        for vid in range(num_vids):
+            counter += 15
+            for frame in range(15,self._lengths[vid]):
+                if len(self.eye_positions[vid][frame]) > 0:
+                    indices.append(counter)
+                counter += 1
+        return indices
 
 """
 def _resize_frame_tensor(frame_tensor,target_shape):
