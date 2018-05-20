@@ -45,7 +45,10 @@ class Examples(ABC):
         if seed is None:
             seed = random.randrange(MAX_INT)
         self.seed = seed
-        self.example_queue = ShuffleQueue(range(self.num_examples),self._rand)
+        self.example_queue = ShuffleQueue(range(len(self)),self._rand)
+
+        self.exception_handlers = getattr(self,"exception_handlers",dict())
+
 
     def __getitem__(self,n):
         return self.get_example(n)
@@ -71,7 +74,7 @@ class Examples(ABC):
 
     def get_batch(self, batch_size, batch_n):
         n_batches = self.n_batches(batch_size)
-        n_examples = len(self.example_queue.container)
+        n_examples = len(self)
         if batch_n >= n_batches:
             raise IndexError("Batch",batch_n,"exceeds number of batches",n_batches)
         batch = []
@@ -80,10 +83,16 @@ class Examples(ABC):
             if i >= n_examples: 
                 raise IndexError("Batch",batch_n,"of",n_batches,"exceeded number of examples")
             try:
-                batch.append(self.get_example(i))
-            except ValueError as e:
-                warn("Exception raised for example {:d}: {}".format(i, e.args),
-                     RuntimeWarning)
+                index=(self.example_queue.container[i])
+                batch.append(self.get_example(index))
+            except tuple(self.exception_handlers.keys()) as e:
+                self.exception_handlers[type(e)](e,index)
+            except Exception as e:
+                print("Exception raised for example {:d}".format(index))
+                print(type(e.args))
+                print(e.args)
+                e.args += (index,)
+                raise e
             i += 1
     
         def stack(x):
@@ -103,14 +112,11 @@ class Examples(ABC):
             example_id = next(self.example_queue)
             try:
                 example = self.get_example(example_id)
-            except (ValueError, IndexError) as e:
-                warn("Exception raised for example {:d}: {}".format(
-                         example_id, e.args),
-                     RuntimeWarning)
-                continue
+            except tuple(self.exception_handlers.keys()) as e:
+                self.exception_handlers[type(e)](e,example_id)
             except Exception as e:
                 print("Exception raised for example {:d}".format(example_id))
-                e.args += [example_id]
+                e.args += (example_id,)
                 raise e
 
         return example
