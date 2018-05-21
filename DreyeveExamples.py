@@ -166,14 +166,18 @@ def _get_frame_tensor(video, frame_of_interest, num_frames=16):
 def _generate_attention_map(gt_coords, size):
     attention_map = np.zeros(size,dtype=np.float32)
     if len(gt_coords) == 0: return attention_map
-    for x, y in gt_coords:
+
+    for y, x in gt_coords:
         ix = int(x); iy = int(y)
-        x2 = x-ix; y2 = y-iy
-        x1 = 1-x2; y1 = 1-y2
-        value=np.array([[x1*y1, x2*y1],
-                        [x1*y2, x2*y2]])
-        value/=len(gt_coords)
-        attention_map[ix:ix+2, iy:iy+2]+=value
+        if any(c+1 >= s for c,s in zip((x,y),size)):
+            attention_map[iy,ix] = 1
+        else:
+            x2 = x-ix; y2 = y-iy
+            x1 = 1-x2; y1 = 1-y2
+            value=np.array([[y1*x1, y2*x1],
+                            [y1*x2, y2*x2]])
+            value/=len(gt_coords)
+            attention_map[iy:iy+2, ix:ix+2] += value
 
     return attention_map
 
