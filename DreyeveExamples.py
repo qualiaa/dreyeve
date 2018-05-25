@@ -9,19 +9,21 @@ from imageio.core.format import CannotReadFrameError
 from pims import ImageIOReader as Reader
 from skimage.transform import resize
 
+from attention_map import attention_map
 from Examples import Examples
 from random_crop_slice import random_crop_slice
 import eye_data
 from consts import *
 
 class DreyeveExamples(Examples):
+    frame_shape = (448,448)
+    example_shape = (112,112)
+
     def __init__(self,
                  folders,
-                 example_shape=(112,112),
                  frames_per_example=16,
                  seed=None):
         self.frames_per_example=frames_per_example
-        self.example_shape=example_shape
         print("Loading eye data...")
         self.eye_positions = eye_data.read(folders)
         print("Loading video files...")
@@ -52,6 +54,12 @@ class DreyeveExamples(Examples):
         return len(self.valid_indices)
     
     def get_example(self, example_id):
+        data = self.get_data(example_id)
+        labels = self.get_labels(example_id)
+
+        return (data, labels)
+
+    def get_data(self, example_id):
         vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
 
         if frame+1 < self.frames_per_example:
@@ -59,65 +67,54 @@ class DreyeveExamples(Examples):
                     "Frame {} below frames_per_example "
                     "for video {}".format(frame,vid_id))
 
-        eye_coords = self.eye_positions[vid_id][frame]
-
-        if len(eye_coords) == 0:
-            raise ValueError("Example has no ground truth")
-
         vid448 = self.videos[448][vid_id]
         vid112 = self.videos[112][vid_id]
 
         tensor = _get_frame_tensor(vid448,frame)
 
-        frame_shape = tensor.shape[2:4]
-
-        crop_slice = random_crop_slice(frame_shape,
+        crop_slice = random_crop_slice(self.frame_shape,
                 self.example_shape, self._rand)
 
         tensor_cropped = tensor[[slice(None),slice(None),*crop_slice]]
         tensor_resized = _get_frame_tensor(vid112,frame)
 
-        attention = get_scaled_attention_map(eye_coords,frame_shape)
-        attention_cropped = attention[crop_slice]
-        attention_resized = get_scaled_attention_map(eye_coords,(448,448))
-        attention_cropped = np.expand_dims(attention_cropped,0)
-        attention_resized = np.expand_dims(attention_resized,0)
-
         # close reader
-        vid112.reader._close()
-        vid112.reader._pos = -101
-        vid448.reader._close()
-        vid448.reader._pos = -101
-        """
-        self.videos[448][vid_id] = Reader(vid448.filename)
-        self.videos[112][vid_id] = Reader(vid112.filename)
-        del vid112,vid448
-        """
+        self._close_video(vid112)
+        self._close_video(vid448)
 
-
-        return ([tensor,
+        return [tensor,
                 tensor_cropped,
-                tensor_resized],
-                [attention_cropped,
-                attention_resized])
+                tensor_resized]
 
-    def next_example(self):
-        try:
-            result = super().next_example()
-        except Exception as e:
-            print("Video {}, frame {}".format(
-                *self._get_video_and_frame_number_from_id(e.args[-1])))
-            raise e
-        return result
+    def _close_video(video):
+        video.reader._close()
+        video.reader._pos = -101
 
-    def get_batch(self, batch_size, batch_n):
+
+    def get_labels(self, example_id):
+        vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
+        if frame+1 < self.frames_per_example:
+            raise IndexError(
+                    "Frame {} below frames_per_example "
+                    "for video {}".format(frame,vid_id))
+
+        crop_slice = random_crop_slice(self.frame_shape,
+                self.example_shape, self._rand)
+
+        eye_coords = self.eye_positions[vid_id][frame]
+
         try:
-            result = super().get_batch(batch_size, batch_n)
-        except Exception as e:
-            print("Video {}, frame {}".format(
-                *self._get_video_and_frame_number_from_id(e.args[-1])))
-            raise e
-        return result
+            attention = attention_map(eye_coords,self.frame_shape)
+            attention_cropped = attention[crop_slice]
+            attention_resized = attention_map(eye_coords,(448,448))
+            attention_cropped = np.expand_dims(attention_cropped,0)
+            attention_resized = np.expand_dims(attention_resized,0)
+        except ValueError:
+            raise ValueError("Example has no ground truth")
+
+        return [attention_cropped, attention_resized]
+
+    """ Helper functions """
 
     def _get_video_and_frame_number_from_id(self,example_id):
         frame_id = self.valid_indices[example_id]
@@ -144,6 +141,26 @@ class DreyeveExamples(Examples):
                 counter += 1
         return indices
 
+    """ Wrap parent fns for exception handling """
+
+    def next_example(self):
+        try:
+            result = super().next_example()
+        except Exception as e:
+            print("Video {}, frame {}".format(
+                *self._get_video_and_frame_number_from_id(e.args[-1])))
+            raise e
+        return result
+
+    def get_batch(self, batch_size, batch_n):
+        try:
+            result = super().get_batch(batch_size, batch_n)
+        except Exception as e:
+            print("Video {}, frame {}".format(
+                *self._get_video_and_frame_number_from_id(e.args[-1])))
+            raise e
+        return result
+
 """
 def _resize_frame_tensor(frame_tensor,target_shape):
     target_shape=(frame_tensor.shape[0],*target_shape,frame_tensor.shape[-1])
@@ -161,34 +178,3 @@ def _get_frame_tensor(video, frame_of_interest, num_frames=16):
     frame_tensor = np.stack(frame_slice, axis=0)
     frame_tensor = np.transpose(frame_tensor,(3,0,1,2))
     return frame_tensor.astype(np.float32)
-
-
-def _generate_attention_map(gt_coords, size):
-    attention_map = np.zeros(size,dtype=np.float32)
-    if len(gt_coords) == 0: return attention_map
-
-    for y, x in gt_coords:
-        ix = int(x); iy = int(y)
-        if any(c+1 >= s for c,s in zip((x,y),size)):
-            attention_map[iy,ix] = 1
-        else:
-            x2 = x-ix; y2 = y-iy
-            x1 = 1-x2; y1 = 1-y2
-            value=np.array([[y1*x1, y2*x1],
-                            [y1*x2, y2*x2]])
-            value/=len(gt_coords)
-            attention_map[iy:iy+2, ix:ix+2] += value
-
-    return attention_map
-
-
-def get_scaled_attention_map(eye_coords, target_shape):
-    # remove non-fixations
-    if len(eye_coords) == 0: raise ValueError("No coords for attention map")
-    # strip label string
-    eye_coords=eye_data.scale_to_shape(eye_coords, target_shape)
-    attention_map=_generate_attention_map(eye_coords, target_shape)
-    return attention_map
-    
-#video_folders = glob(DATA_DIR+"/[0-9][0-9]")
-#training_examples = Examples(video_folders)
