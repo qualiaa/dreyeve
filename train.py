@@ -7,6 +7,7 @@ import tensorflow as tf
 import warnings
 
 import network
+import consts as c
 from Examples import KerasSequenceWrapper
 from DreyeveExamples import DreyeveExamples
 
@@ -19,9 +20,16 @@ model.compile(optimizer='adam',loss='mse',options=opts)
 
 video_folders = glob("DREYEVE_DATA/[0-9][0-9]")
 
-examples = KerasSequenceWrapper(DreyeveExamples, 5,video_folders)
+train_split = int(c.TRAIN_SPLIT * len(video_folders))
+validation_split = int(c.VALIDATION_SPLIT * train_split)
 
-model.fit_generator(examples)
-#model.fit_generator(examples,
-                    #use_multiprocessing=True,
-                    #workers=4)
+train_folders = video_folders[:train_split][:validation_split]
+validation_folders = video_folders[:train_split][validation_split:]
+
+train_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,video_folders)
+validation_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,video_folders)
+
+model.fit_generator(examples,
+                    validation=validation_examples,
+                    use_multiprocessing=c.USE_MULTIPROCESSING,
+                    workers=c.WORKERS)
