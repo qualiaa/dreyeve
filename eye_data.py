@@ -6,6 +6,14 @@ import numpy as np
 
 from consts import *
 
+class Labels:
+    FIXATION = 0
+    SACCADE = 1
+    BLINK = 2
+
+LABEL_NAMES = { s:getattr(Labels,s) for s in Labels.__dict__.keys()
+        if not s.startswith("_")}
+
 def read(video_folders):
     """ Return an array of """
     eye_positions = list()
