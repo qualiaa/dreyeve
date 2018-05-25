@@ -30,8 +30,8 @@ validation_folders = video_folders[:train_split][validation_split:]
 train_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,video_folders)
 validation_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,video_folders)
 
-model.fit_generator(examples,
-                    validation=validation_examples,
+model.fit_generator(train_examples,
+                    validation_data=validation_examples,
                     use_multiprocessing=c.USE_MULTIPROCESSING,
                     workers=c.WORKERS)
 
