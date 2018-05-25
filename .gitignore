@@ -2,3 +2,5 @@ DREYEVE_DATA
 *.pyc
 *.png
 *.pkl.xz
+*.sw?
+*.h5
