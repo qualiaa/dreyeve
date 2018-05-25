@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 from glob import glob
 
 import numpy as np
@@ -33,3 +34,6 @@ model.fit_generator(examples,
                     validation=validation_examples,
                     use_multiprocessing=c.USE_MULTIPROCESSING,
                     workers=c.WORKERS)
+
+print("Saving weights")
+model.save_weights("weights.h5")
