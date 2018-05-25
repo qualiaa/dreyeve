@@ -9,4 +9,4 @@ VIDEO_SHAPE=(1080,1920,3)
 VALIDATION_SPLIT = 0.1
 
 # ratio of all files for train
-TRAIN_SPLIT = 0.2
+TRAIN_SPLIT = 0.8

@@ -24,11 +24,13 @@ video_folders = glob("DREYEVE_DATA/[0-9][0-9]")
 train_split = int(c.TRAIN_SPLIT * len(video_folders))
 validation_split = int(c.VALIDATION_SPLIT * train_split)
 
-train_folders = video_folders[:train_split][:validation_split]
-validation_folders = video_folders[:train_split][validation_split:]
+train_folders = video_folders[:train_split][:-validation_split]
+validation_folders = video_folders[:train_split][-validation_split:]
 
-train_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,video_folders)
-validation_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,video_folders)
+seq = lambda x: KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,x)
+
+train_examples = seq(train_folders)
+validation_examples = seq(validation_folders)
 
 model.fit_generator(train_examples,
                     validation_data=validation_examples,
