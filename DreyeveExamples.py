@@ -48,6 +48,7 @@ class DreyeveExamples(Examples):
             RuntimeWarning)
         eh[IndexError] = eh[ValueError]
         #self.exception_handlers = eh
+
         super().__init__(seed)
 
     def __len__(self):
@@ -79,16 +80,12 @@ class DreyeveExamples(Examples):
         tensor_resized = _get_frame_tensor(vid112,frame)
 
         # close reader
-        self._close_video(vid112)
-        self._close_video(vid448)
+        _close_video(vid112)
+        _close_video(vid448)
 
         return [tensor,
                 tensor_cropped,
                 tensor_resized]
-
-    def _close_video(video):
-        video.reader._close()
-        video.reader._pos = -101
 
 
     def get_labels(self, example_id):
@@ -178,3 +175,10 @@ def _get_frame_tensor(video, frame_of_interest, num_frames=16):
     frame_tensor = np.stack(frame_slice, axis=0)
     frame_tensor = np.transpose(frame_tensor,(3,0,1,2))
     return frame_tensor.astype(np.float32)
+
+def _close_video(video):
+        video.reader._close()
+        video.reader._pos = -101
+
+def flatten(l):
+    return [x for sublist in l for x in sublist]
