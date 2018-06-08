@@ -17,7 +17,7 @@ def flip(f):
 apply_sequence = lambda l, x: reduce(flip(apply), l, x)
 
 
-def model():
+def model(weights_file = None):
     data_format = "channels_first"
 
     """
@@ -93,13 +93,14 @@ def model():
     model = Model(inputs=[full_input,cropped_input,resized_input],
                   outputs=[cropped_output,fine_output])
 
-    c3d_params = pkl_xz.load("c3d_weights.pkl.xz")
-    pretrained_layers = [2,4,6,7,9,10]
-    for l, p in zip(pretrained_layers, c3d_params):
-        model.layers[l].trainable=False
-        model.layers[l].set_weights(p)
-    del c3d_params
-
-    model.compile(optimizer='adam',loss='mse')
+    if weights_file is None:
+        c3d_params = pkl_xz.load("c3d_weights.pkl.xz")
+        pretrained_layers = [2,4,6,7,9,10]
+        for l, p in zip(pretrained_layers, c3d_params):
+            model.layers[l].trainable=False
+            model.layers[l].set_weights(p)
+        del c3d_params
+    else:
+        model.load_weights(weights_file)
 
     return model
