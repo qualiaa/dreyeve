@@ -1,7 +1,8 @@
 import numpy as np
 import eye_data
+from scipy import signal
 
-def attention_map(eye_coords, shape):
+def attention_map(eye_coords, output_shape, point_size):
     # remove non-fixations
     if len(eye_coords) == 0: raise ValueError("No coords for attention map")
     eye_coords = eye_data.scale_to_shape(eye_coords, shape)
@@ -20,3 +21,28 @@ def attention_map(eye_coords, shape):
             attention_map[iy:iy+2, ix:ix+2] += value
 
     return attention_map
+
+def add_point(canvas, coord, brush):
+    coord_indices = [int(round(a)) for a in coord]
+    last_indices = [min(centre + brush_size, canvas_size-1) for
+            centre,brush_size,canvas_size in
+            zip(coord,brush.shape,canvas.shape)]
+    start_indices = [max(centre - brush_size, 0) for
+            centre,brush_size in zip(coord,brush.shape)]
+    window_rect = zip(*list(zip(start_indices,last_indices)))
+    print(window_rect)
+
+def gaussian_2d(size):
+    assert size % 2 == 1
+    sd=(size-1)/3
+    g = np.expand_dims(signal.gaussian(size,sd),0)
+    return np.matmul(g.T, g)
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    canvas = np.zeros((100,100))
+    g = gaussian_2d(11)
+
+    add_point(canvas, (50,50), g)
+    
+    plt.imshow(g)
