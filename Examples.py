@@ -28,7 +28,7 @@ class KerasSequenceWrapper(Sequence):
     def __len__(self):
         return self.examples.n_batches(self.batch_size)
 
-    def on_epoch_end():
+    def on_epoch_end(self):
         self.examples.example_queue.next_epoch()
 
 
