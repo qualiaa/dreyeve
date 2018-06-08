@@ -23,7 +23,7 @@ class ShuffleQueue(collections.UserList):
         self.counter += 1
         return result
 
-    def next_epoch():
+    def next_epoch(self):
         self.counter = 0
         self.rand.shuffle(self.container)
         self._epoch += 1
