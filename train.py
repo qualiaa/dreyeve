@@ -19,7 +19,7 @@ model = network.model()
 opts = tf.RunOptions(report_tensor_allocations_upon_oom=True)
 model.compile(optimizer='adam',loss='mse',options=opts)
 
-video_folders = glob("DREYEVE_DATA/[0-9][0-9]")
+video_folders = glob(c.DATA_DIR + "/[0-9][0-9]")
 
 train_split = int(c.TRAIN_SPLIT * len(video_folders))
 validation_split = int(c.VALIDATION_SPLIT * train_split)
