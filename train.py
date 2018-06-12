@@ -9,7 +9,7 @@ import warnings
 
 import network
 import consts as c
-from Examples import KerasSequenceWrapper
+from utils.Examples import KerasSequenceWrapper
 from DreyeveExamples import DreyeveExamples
 
 warnings.filterwarnings("ignore")

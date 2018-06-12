@@ -1,6 +1,7 @@
 import numpy as np
 from glob import glob
-from xz_compress import load_pkl_xz
+
+import utils.pkl_xz
 
 # files are batches of 16 frames
 BATCH_SIZE = 16
@@ -80,7 +81,7 @@ class BatchedVideo:
 
     def _get_batch(self,n):
         path = self.folder + self.batch_format_string.format(n)
-        return load_pkl_xz(path)
+        return pkl_xz.load(path)
 
     def validate_batches(self):
         errors = dict()

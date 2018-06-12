@@ -9,9 +9,9 @@ from imageio.core.format import CannotReadFrameError
 from pims import ImageIOReader as Reader
 from skimage.transform import resize
 
-from attention_map import attention_map
-from Examples import Examples
-from random_crop_slice import random_crop_slice
+from utils.attention_map import attention_map
+from utils.Examples import Examples
+from utils.random_crop_slice import random_crop_slice
 import eye_data
 from consts import *
 
