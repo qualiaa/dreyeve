@@ -81,11 +81,7 @@ if __name__ == "__main__":
     video112 = Reader(video_folder + "/garmin_resized_112.avi")
     frame112 = video112[frame_number]
 
-    clip_data = []
-    for i in range(frame_number,frame_number-num_frames,-1):
-        try:
-            clip_data.append(gaze_points[i])
-        except KeyError: continue
+    clip_data = eye_data.get_consecutive_frames(gaze_points, frame_number-1-num_frames, num_frames)
 
     plt.figure()
     plt.subplot(221)
