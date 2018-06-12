@@ -11,7 +11,7 @@ class Labels:
     SACCADE = 1
     BLINK = 2
 
-LABEL_NAMES = { s:getattr(Labels,s) for s in Labels.__dict__.keys()
+LABEL_NAMES = { s:getattr(Labels,s) for s in Labels.__dict__.keys():
         if not s.startswith("_")}
 
 def read(video_folders, desired_labels = [Labels.FIXATION]):
@@ -63,7 +63,7 @@ def scale_to_shape(coords, target_shape):
         coords=coords*scale
     return coords
 
-def get_consecutive_frames(video_data, start_frame, num_frames)
+def get_consecutive_frames(video_data, start_frame, num_frames):
     result = []
     for i in range(start_frame, start_frame + num_frames):
         try:
