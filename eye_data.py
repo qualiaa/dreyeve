@@ -62,3 +62,11 @@ def scale_to_shape(coords, target_shape):
         scale=np.array([t/s for s, t in zip(source_shape, target_shape)])
         coords=coords*scale
     return coords
+
+def get_consecutive_frames(video_data, start_frame, num_frames)
+    result = []
+    for i in range(start_frame, start_frame + num_frames):
+        try:
+            result.append(video_data[i])
+        except KeyError: continue
+    return result

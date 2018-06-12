@@ -98,14 +98,14 @@ class DreyeveExamples(Examples):
         crop_slice = random_crop_slice(self.frame_shape,
                 self.example_shape, self._rand)
 
-        eye_coords = self.eye_positions[vid_id][frame]
+        eye_coords = eye_data.get_consecutive_frame(self.eye_positions[vid_id],
+                frame, 16)
 
         try:
-            attention = attention_map(eye_coords,self.frame_shape)
+            attention_resized = attention_map(eye_coords,self.frame_shape,16,np.exp)
             attention_cropped = attention[crop_slice]
-            attention_resized = attention_map(eye_coords,(448,448))
-            attention_cropped = np.expand_dims(attention_cropped,0)
             attention_resized = np.expand_dims(attention_resized,0)
+            attention_cropped = np.expand_dims(attention_cropped,0)
         except ValueError:
             raise ValueError("Example has no ground truth")
 
