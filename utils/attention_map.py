@@ -67,27 +67,33 @@ def bilinear_1px(coord):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    from pims import ImageIOReader as Reader
     canvas = np.zeros((100,100))
     g = gaussian_2d(19)
     video_folder = c.DATA_DIR + "/01"
 
     gaze_points = eye_data.read([video_folder])[0]
+    num_frames = 50
+    frame_number = 1014
 
-    num_frames = 100
-
-    frame = 1014
+    video448 = Reader(video_folder + "/garmin_resized_448.avi")
+    frame448 = video448[frame_number]
+    video112 = Reader(video_folder + "/garmin_resized_112.avi")
+    frame112 = video112[frame_number]
 
     clip_data = []
-    for i in range(frame,frame-num_frames,-1):
+    for i in range(frame_number,frame_number-num_frames,-1):
         try:
             clip_data.append(gaze_points[i])
         except KeyError: continue
 
     plt.figure()
-    plt.imshow(_attention_map(clip_data, (100,140),))
-    plt.show()
-    plt.subplot(121)
-    plt.imshow(_attention_map(clip_data, (100,140),5))
-    plt.subplot(122)
-    plt.imshow(_attention_map(clip_data, (100,140),5, np.exp))
+    plt.subplot(221)
+    plt.imshow(_attention_map(clip_data, (448,448),16))
+    plt.subplot(222)
+    plt.imshow(frame448)
+    plt.subplot(223)
+    plt.imshow(_attention_map(clip_data, (112,112), 4, np.exp))
+    plt.subplot(224)
+    plt.imshow(frame112)
     plt.show()
