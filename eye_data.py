@@ -23,7 +23,7 @@ def read(video_folders, desired_labels = [Labels.FIXATION]):
     eye_positions = list()
 
     for i, folder in enumerate(video_folders):
-        eye_pos = defaultdict(list)
+        video_data = defaultdict(list)
         with open(folder + "/etg_samples.txt") as f:
             eye_data = csv.reader(f, delimiter=' ', dialect="unix")
             next(eye_data) # skip csv header
@@ -41,17 +41,18 @@ def read(video_folders, desired_labels = [Labels.FIXATION]):
                 if label not in desired_labels: continue
 
                 frame = int(frame)
-                coords = np.array([float(y), float(x)])
+                coords = [float(y), float(x)]
 
                 # filter invalid gaze-points
                 if any(a > b for a, b in zip(coords,VIDEO_SHAPE)) or any(
                         a < 0 or math.isnan(a) for a in coords):
                     continue
 
-                #eye_pos[frame].append((label_id, coords))
-                eye_pos[frame].append(coords)
-            eye_pos[frame]=np.array(eye_pos[frame])
-        eye_positions.append(eye_pos)
+                #video_data[frame].append((label_id, coords))
+                video_data[frame].append(coords)
+            # convert coordinates to numpy array
+            video_data = dict((a,np.array(b)) for a, b in video_data.items())
+        eye_positions.append(video_data)
     return eye_positions
 
 def scale_to_shape(coords, target_shape):
