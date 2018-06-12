@@ -51,7 +51,7 @@ def read(video_folders, desired_labels = [Labels.FIXATION]):
                 #video_data[frame].append((label_id, coords))
                 video_data[frame].append(coords)
             # convert coordinates to numpy array
-            video_data = dict((a,np.array(b)) for a, b in video_data.items())
+            video_data = dict((a,np.array(b).reshape(-1,2)) for a, b in video_data.items())
         eye_positions.append(video_data)
     return eye_positions
 
