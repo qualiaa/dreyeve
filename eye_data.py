@@ -11,7 +11,7 @@ class Labels:
     SACCADE = 1
     BLINK = 2
 
-LABEL_NAMES = { s:getattr(Labels,s) for s in Labels.__dict__.keys():
+LABEL_NAMES = { s:getattr(Labels,s) for s in Labels.__dict__.keys()
         if not s.startswith("_")}
 
 def read(video_folders, desired_labels = [Labels.FIXATION]):
