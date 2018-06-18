@@ -3,18 +3,9 @@ import eye_data
 import consts as c
 from scipy import signal
 
-from stamp import stamp
+from .stamp import stamp
 
-def attention_map(eye_coords, output_shape, point_radius=0,decay_fn=None):
-    return _attention_map([eye_coords], output_shape, point_radius)
-
-def gaussian_2d(size):
-    assert size % 2 == 1
-    sd=(size-1)/6
-    g = np.expand_dims(signal.gaussian(size,sd),0)
-    return np.matmul(g.T, g)
-
-def _attention_map(clip_coords, output_shape, point_radius=0, decay_fn=None):
+def attention_map(clip_coords, output_shape, point_radius=0, decay_fn=None):
     if type(clip_coords) == tuple:
         if len(clip_coords) != 2:
             raise TypeError("Attention map expects single coordinate pair,"
@@ -23,11 +14,12 @@ def _attention_map(clip_coords, output_shape, point_radius=0, decay_fn=None):
         clip_coords = np.array(clip_coords)
     if type(clip_coords) == np.ndarray:
         clip_coords = [clip_coords]
+    if len(clip_coords) == 0: raise ValueError("No coords for attention map",
+            clip_coords)
     if type(clip_coords[0]) != np.ndarray:
         raise TypeError("Attention map expects single coordinate pair,"
                 "np.ndarray of coordinate pairs, or list of np.ndarray per frame",
             clip_coords)
-    if len(clip_coords) == 0: raise ValueError("No coords for attention map")
 
     if point_radius >= 1:
         brush = gaussian_2d(point_radius * 2 + 1)
@@ -53,7 +45,14 @@ def _attention_map(clip_coords, output_shape, point_radius=0, decay_fn=None):
     if attention_sum > 0:
         attention_map /= attention_sum
     return attention_map
-            
+
+
+def gaussian_2d(size):
+    assert size % 2 == 1
+    sd=(size-1)/6
+    g = np.expand_dims(signal.gaussian(size,sd),0)
+    return np.matmul(g.T, g)
+
 
 def bilinear_1px(coord):
     brush = np.zeros((3,3))
@@ -81,7 +80,7 @@ if __name__ == "__main__":
     video112 = Reader(video_folder + "/garmin_resized_112.avi")
     frame112 = video112[frame_number]
 
-    clip_data = eye_data.get_consecutive_frames(gaze_points, frame_number-1-num_frames, num_frames)
+    clip_data = eye_data.get_consecutive_frames(gaze_points, frame_number+1-num_frames, num_frames)
 
     plt.figure()
     plt.subplot(221)

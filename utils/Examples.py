@@ -12,7 +12,7 @@ from warnings import warn
 import numpy as np
 from keras.utils import Sequence
 
-from ShuffleQueue import ShuffleQueue
+from .ShuffleQueue import ShuffleQueue
 
 
 class KerasSequenceWrapper(Sequence):
@@ -89,8 +89,6 @@ class Examples(ABC):
                 self.exception_handlers[type(e)](e,index)
             except Exception as e:
                 print("Exception raised for example {:d}".format(index))
-                print(type(e.args))
-                print(e.args)
                 e.args += (index,)
                 raise e
             i += 1
