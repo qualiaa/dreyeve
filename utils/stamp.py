@@ -11,7 +11,7 @@ def stamp(canvas, coord, brush, out=None, additive=True):
     end_coords = [c + brush_shape//2 + 1 for c, brush_shape in zip(centre, brush.shape)]
 
     brush_start = [0,0]
-    brush_end = brush.shape
+    brush_end = list(brush.shape)
 
     for i, start_coord in enumerate(start_coords):
         if start_coord < 0:
