@@ -27,9 +27,13 @@ validation_split = int(c.VALIDATION_SPLIT * train_split)
 train_folders = video_folders[:train_split][:-validation_split]
 validation_folders = video_folders[:train_split][-validation_split:]
 
-seq = lambda x: KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,x)
+seq = lambda x: KerasSequenceWrapper(DreyeveExamples,
+        c.BATCH_SIZE, x,
+        gaze_radius = GAZE_RADIUS,
+        self.gaze_frames = GAZE_FRAMES,
 
 train_examples = seq(train_folders)
+
 validation_examples = seq(validation_folders)
 
 model.fit_generator(train_examples,
@@ -37,5 +41,6 @@ model.fit_generator(train_examples,
                     use_multiprocessing=c.USE_MULTIPROCESSING,
                     workers=c.WORKERS)
 
+
 print("Saving weights")
-model.save_weights("weights.h5")
+model.save_weights("weights_gaussian_16.h5")

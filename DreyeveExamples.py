@@ -21,8 +21,12 @@ class DreyeveExamples(Examples):
 
     def __init__(self,
                  folders,
+                 gaze_radius=16,
+                 gaze_frames=1,
                  frames_per_example=16,
                  seed=None):
+        self.gaze_radius = gaze_radius
+        self.gaze_frames = gaze_frames
         self.frames_per_example=frames_per_example
         print("Loading eye data...")
         self.eye_positions = eye_data.read(folders)
@@ -98,12 +102,13 @@ class DreyeveExamples(Examples):
         crop_slice = random_crop_slice(self.frame_shape,
                 self.example_shape, self._rand)
 
-        eye_coords = eye_data.get_consecutive_frame(self.eye_positions[vid_id],
-                frame, 16)
+        eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
+                frame, self.gaze_frames)
+
 
         try:
-            attention_resized = attention_map(eye_coords,self.frame_shape,16,np.exp)
-            attention_cropped = attention[crop_slice]
+            attention_resized = attention_map(eye_coords,self.frame_shape,self.gaze_radius,np.exp)
+            attention_cropped = attention_resized[crop_slice]
             attention_resized = np.expand_dims(attention_resized,0)
             attention_cropped = np.expand_dims(attention_cropped,0)
         except ValueError:
