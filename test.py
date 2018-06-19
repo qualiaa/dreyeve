@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import re
 from glob import glob
 
 import numpy as np
@@ -15,6 +16,8 @@ from DreyeveExamples import DreyeveExamples
 
 def test(filename):
     warnings.filterwarnings("ignore")
+
+    gaze_radius, gaze_frames = re.match(".*_([0-9]+)_([0-9]+).h5",filename)
 
     print("Loading model...")
     model = network.model(weights_file="weights.h5")
@@ -32,7 +35,8 @@ def test(filename):
             DreyeveExamples,
             c.BATCH_SIZE,
             test_folders,
-            gaze_radius=)
+            gaze_radius=gaze_radius,
+            gaze_frames=gaze_frames)
 
     results = model.evaluate_generator(test_examples,
                         use_multiprocessing=c.USE_MULTIPROCESSING,
@@ -45,4 +49,4 @@ if __name__ == "__main__":
         sys.stderr.write("Must provide one or more weight files as arguments")
         sys.exit(1)
     for filename in sys.argv[1:]
-    test(sys.argv[
+        test(filename)
