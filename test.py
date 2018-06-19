@@ -12,22 +12,37 @@ import consts as c
 from utils.Examples import KerasSequenceWrapper
 from DreyeveExamples import DreyeveExamples
 
-warnings.filterwarnings("ignore")
 
-print("Loading model...")
-model = network.model(weights_file="weights_full_train.h5")
-opts = tf.RunOptions(report_tensor_allocations_upon_oom=True)
-model.compile(optimizer='adam',loss='mse',options=opts)
+def test(filename):
+    warnings.filterwarnings("ignore")
 
-video_folders = glob(c.DATA_DIR + "/[0-9][0-9]")
+    print("Loading model...")
+    model = network.model(weights_file="weights.h5")
+    opts = tf.RunOptions(report_tensor_allocations_upon_oom=True)
+    model.compile(optimizer='adam',loss='mse',options=opts)
 
-train_split = int(c.TRAIN_SPLIT * len(video_folders))
-validation_split = int(c.VALIDATION_SPLIT * train_split)
+    video_folders = glob(c.DATA_DIR + "/[0-9][0-9]")
 
-test_folders = video_folders[train_split:]
+    train_split = int(c.TRAIN_SPLIT * len(video_folders))
+    validation_split = int(c.VALIDATION_SPLIT * train_split)
 
-test_examples = KerasSequenceWrapper(DreyeveExamples,c.BATCH_SIZE,test_folders)
+    test_folders = video_folders[train_split:]
 
-model.evaluate_generator(test_examples,
-                    use_multiprocessing=c.USE_MULTIPROCESSING,
-                    workers=c.WORKERS)
+    test_examples = KerasSequenceWrapper(
+            DreyeveExamples,
+            c.BATCH_SIZE,
+            test_folders,
+            gaze_radius=)
+
+    results = model.evaluate_generator(test_examples,
+                        use_multiprocessing=c.USE_MULTIPROCESSING,
+                        workers=c.WORKERS)
+
+    print(filename + ":",results)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        sys.stderr.write("Must provide one or more weight files as arguments")
+        sys.exit(1)
+    for filename in sys.argv[1:]
+    test(sys.argv[
