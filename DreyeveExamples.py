@@ -133,8 +133,10 @@ class DreyeveExamples(Examples):
         for vid in range(num_vids):
             counter += 15
             for frame in range(15,self._lengths[vid]):
-                if len(self.eye_positions[vid][frame]) > 0:
-                    indices.append(counter)
+                try:
+                    if type(self.eye_positions[vid][frame]) == np.ndarray:
+                        indices.append(counter)
+                except KeyError: ""
                 counter += 1
         return indices
 
