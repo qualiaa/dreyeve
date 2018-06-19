@@ -12,6 +12,9 @@ import consts as c
 from utils.Examples import KerasSequenceWrapper
 from DreyeveExamples import DreyeveExamples
 
+GAZE_FRAMES = 1
+GAZE_RADIUS = 16
+
 warnings.filterwarnings("ignore")
 
 print("Loading model...")
@@ -30,7 +33,7 @@ validation_folders = video_folders[:train_split][-validation_split:]
 seq = lambda x: KerasSequenceWrapper(DreyeveExamples,
         c.BATCH_SIZE, x,
         gaze_radius = GAZE_RADIUS,
-        self.gaze_frames = GAZE_FRAMES,
+        gaze_frames = GAZE_FRAMES)
 
 train_examples = seq(train_folders)
 
@@ -43,4 +46,4 @@ model.fit_generator(train_examples,
 
 
 print("Saving weights")
-model.save_weights("weights_gaussian_16.h5")
+model.save_weights("weights_gaussian_16_no_hist.h5")
