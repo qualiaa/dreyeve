@@ -59,13 +59,20 @@ class DreyeveExamples(Examples):
         return len(self.valid_indices)
     
     def get_example(self, example_id):
-        data = self.get_data(example_id)
-        labels = self.get_labels(example_id)
+        crop_slice = random_crop_slice(self.frame_shape,
+                self.example_shape, self._rand)
+
+        data = self.get_data(example_id, crop_slice)
+        labels = self.get_labels(example_id, crop_slice)
 
         return (data, labels)
 
-    def get_data(self, example_id):
+    def get_data(self, example_id, crop_slice=None):
         vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
+
+        if crop_slice is None:
+            crop_slice = random_crop_slice(self.frame_shape,
+                    self.example_shape, self._rand)
 
         if frame+1 < self.frames_per_example:
             raise IndexError(
@@ -76,9 +83,6 @@ class DreyeveExamples(Examples):
         vid112 = self.videos[112][vid_id]
 
         tensor = _get_frame_tensor(vid448,frame)
-
-        crop_slice = random_crop_slice(self.frame_shape,
-                self.example_shape, self._rand)
 
         tensor_cropped = tensor[[slice(None),slice(None),*crop_slice]]
         tensor_resized = _get_frame_tensor(vid112,frame)
@@ -92,15 +96,16 @@ class DreyeveExamples(Examples):
                 tensor_resized]
 
 
-    def get_labels(self, example_id):
+    def get_labels(self, example_id, crop_slice=None):
         vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
         if frame+1 < self.frames_per_example:
             raise IndexError(
                     "Frame {} below frames_per_example "
                     "for video {}".format(frame,vid_id))
 
-        crop_slice = random_crop_slice(self.frame_shape,
-                self.example_shape, self._rand)
+        if crop_slice is None:
+            crop_slice = random_crop_slice(self.frame_shape,
+                    self.example_shape, self._rand)
 
         eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
                 frame, self.gaze_frames)
