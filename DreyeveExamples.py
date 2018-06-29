@@ -5,6 +5,7 @@ from pathlib import Path, PurePath
 from warnings import warn
 
 import numpy as np
+from imageio import imread
 from imageio.core.format import CannotReadFrameError
 from pims import ImageIOReader as Reader
 from skimage.transform import resize
@@ -33,6 +34,10 @@ class DreyeveExamples(Examples):
         print("Loading video files...")
         self.videos = {
                 x: [Reader(str(Path(folder, "garmin_resized_{:d}.avi".format(x))))
+                    for folder in folders]
+                for x in [112,448]}
+        self.mean_frame = {
+                x: [imread(str(Path(folder, "mean_frame_{:d}.png".format(x))))
                     for folder in folders]
                 for x in [112,448]}
         print("Done")
@@ -68,26 +73,28 @@ class DreyeveExamples(Examples):
         return (data, labels)
 
     def get_data(self, example_id, crop_slice=None):
-        vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
+        vid_id,frame_number = self._get_video_and_frame_number_from_id(example_id)
 
         if crop_slice is None:
             crop_slice = random_crop_slice(self.frame_shape,
                     self.example_shape, self._rand)
 
-        if frame+1 < self.frames_per_example:
+        if frame_number+1 < self.frames_per_example:
             raise IndexError(
                     "Frame {} below frames_per_example "
-                    "for video {}".format(frame,vid_id))
+                    "for video {}".format(frame_number,vid_id))
 
         vid448 = self.videos[448][vid_id]
         vid112 = self.videos[112][vid_id]
+        mf448 = self.mean_frame[448][vid_id]
+        mf112 = self.mean_frame[112][vid_id]
 
-        tensor = _get_frame_tensor(vid448,frame)
+        tensor = _get_frame_tensor(vid448, frame_number, mf448)
 
         tensor_cropped = tensor[[slice(None),slice(None),*crop_slice]]
-        tensor_resized = _get_frame_tensor(vid112,frame)
+        tensor_resized = _get_frame_tensor(vid112, frame_number, mf112)
 
-        # close reader
+        # close reader to prevent reaching process limit
         _close_video(vid112)
         _close_video(vid448)
 
@@ -97,18 +104,18 @@ class DreyeveExamples(Examples):
 
 
     def get_labels(self, example_id, crop_slice=None):
-        vid_id,frame = self._get_video_and_frame_number_from_id(example_id)
-        if frame+1 < self.frames_per_example:
+        vid_id,frame_number = self._get_video_and_frame_number_from_id(example_id)
+        if frame_number+1 < self.frames_per_example:
             raise IndexError(
                     "Frame {} below frames_per_example "
-                    "for video {}".format(frame,vid_id))
+                    "for video {}".format(frame_number,vid_id))
 
         if crop_slice is None:
             crop_slice = random_crop_slice(self.frame_shape,
                     self.example_shape, self._rand)
 
         eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
-                frame, self.gaze_frames)
+                frame_number, self.gaze_frames)
 
 
         try:
@@ -177,7 +184,7 @@ def _resize_frame_tensor(frame_tensor,target_shape):
 """
 
 
-def _get_frame_tensor(video, frame_of_interest, num_frames=16):
+def _get_frame_tensor(video, frame_of_interest, mean_frame, num_frames=16):
     """ return N stacked, resized frames from frame [I-N, I] """
     foi = frame_of_interest
     if foi < num_frames - 1:
@@ -185,8 +192,10 @@ def _get_frame_tensor(video, frame_of_interest, num_frames=16):
                          " must have 15 preceding frames")
     frame_slice = video[foi-num_frames+1:foi+1]
     frame_tensor = np.stack(frame_slice, axis=0)
+    frame_tensor = frame_tensor.astype(np.float32)
+    frame_tensor = (frame_tensor - mean_frame)
     frame_tensor = np.transpose(frame_tensor,(3,0,1,2))
-    return frame_tensor.astype(np.float32)
+    return frame_tensor
 
 def _close_video(video):
         video.reader._close()
