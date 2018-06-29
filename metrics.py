@@ -3,9 +3,8 @@ import keras.backend as K
 def kl_divergence(y_true, y_pred):
     eps = K.epsilon() # 1.19e-07
     denom = (eps + y_true)
-    numer = eps + y_pred
-    ratio = numer/denom
-    return K.sum(K.tf.multiply(y_pred,K.log(denom)))
+    ratio = y_pred/denom
+    return K.sum(K.tf.multiply(y_pred,K.log(eps + ratio)))
 
 
 def cross_correlation(y_true, y_pred):
