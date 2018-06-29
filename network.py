@@ -69,7 +69,7 @@ def model(weights_file = None):
         C2(32), LeakyReLU(0.001),
         C2(16), LeakyReLU(0.001),
         C2(4), LeakyReLU(0.001),
-        C2(1), Activation("relu")
+        C2(1), Activation("relu",name="fine_output")
     ]
 
     def coarse_inference(x):
@@ -78,15 +78,14 @@ def model(weights_file = None):
     # Coarse network output
     cropped_input = Input(shape=(3,16,112,112),dtype='float32',name="cropped_input")
     cropped_output = coarse_inference(cropped_input)
+    cropped_output = Activation("linear",name="coarse_output")(cropped_output)
 
 
     # Fine-tuned network output
     resized_input = Input(shape=(3,16,112,112),dtype='float32',name="resized_input")
     resized_output = coarse_inference(resized_input)
-    take_last_frame = Lambda(lambda x: x[:,:,-1,:,:],output_shape = (3,448,448))
 
-    full_input = Input(shape=(3,16,448,448),dtype='float32',name="full_input")
-    last_frame = take_last_frame(full_input)
+    last_frame = Input(shape=(3,448,448),dtype='float32',name="last_frame")
     resized_output = UpSampling2D(size=(4,4),data_format=data_format)(
             resized_output)
 
@@ -94,7 +93,7 @@ def model(weights_file = None):
     fine_output = apply_sequence(fine_architecture, fine_input)
 
     # Build model
-    model = Model(inputs=[full_input,cropped_input,resized_input],
+    model = Model(inputs=[cropped_input,resized_input,last_frame],
                   outputs=[cropped_output,fine_output])
 
     if weights_file is None:

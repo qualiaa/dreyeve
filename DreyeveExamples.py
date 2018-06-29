@@ -89,18 +89,19 @@ class DreyeveExamples(Examples):
         mf448 = self.mean_frame[448][vid_id]
         mf112 = self.mean_frame[112][vid_id]
 
-        tensor = _get_frame_tensor(vid448, frame_number, mf448)
+        clip = _get_frame_tensor(vid448, frame_number, mf448)
 
-        tensor_cropped = tensor[[slice(None),slice(None),*crop_slice]]
-        tensor_resized = _get_frame_tensor(vid112, frame_number, mf112)
+        clip_cropped = clip[[slice(None),slice(None),*crop_slice]]
+        clip_resized = _get_frame_tensor(vid112, frame_number, mf112)
+        last_frame = clip[:,-1,...]
 
         # close reader to prevent reaching process limit
         _close_video(vid112)
         _close_video(vid448)
 
-        return [tensor,
-                tensor_cropped,
-                tensor_resized]
+        return [clip_cropped,
+                clip_resized,
+                last_frame]
 
 
     def get_labels(self, example_id, crop_slice=None):
