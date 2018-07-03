@@ -29,8 +29,8 @@ train_folders = video_folders[:train_split][:-validation_split]
 validation_folders = video_folders[:train_split][-validation_split:]
 #test_folders = video_folders[train_split:]
 
-train = KerasSequenceWrapper(DreyeveExamples,train_folders)
-val = KerasSequenceWrapper(DreyeveExamples,validation_folders)
+train = DreyeveExamples(train_folders)
+val = DreyeveExamples(validation_folders)
 
 files = glob("history*pkl.xz")
 
