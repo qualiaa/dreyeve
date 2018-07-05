@@ -122,8 +122,6 @@ class DreyeveExamples(Examples):
         try:
             attention_resized = attention_map(eye_coords,self.frame_shape,self.gaze_radius,np.exp)
             attention_cropped = attention_resized[crop_slice]
-            attention_resized = np.expand_dims(attention_resized,0)
-            attention_cropped = np.expand_dims(attention_cropped,0)
         except ValueError:
             raise ValueError("Example has no ground truth")
 
