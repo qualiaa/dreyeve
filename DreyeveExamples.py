@@ -24,11 +24,14 @@ class DreyeveExamples(Examples):
                  folders,
                  gaze_radius=16,
                  gaze_frames=1,
+                 predict=False,
                  frames_per_example=16,
                  seed=None):
         self.gaze_radius = gaze_radius
         self.gaze_frames = gaze_frames
+        self.predict = predict
         self.frames_per_example=frames_per_example
+
         print("Loading eye data...")
         self.eye_positions = eye_data.read(folders)
         print("Loading video files...")
@@ -66,9 +69,14 @@ class DreyeveExamples(Examples):
     def get_example(self, example_id):
         crop_slice = random_crop_slice(self.frame_shape,
                 self.example_shape, self._rand)
+        labels = self.get_labels(example_id, crop_slice)
+        if not self.predict:
+            while labels[0].sum() < EPS:
+                crop_slice = random_crop_slice(self.frame_shape,
+                        self.example_shape, self._rand)
+                labels = self.get_labels(example_id, crop_slice)
 
         data = self.get_data(example_id, crop_slice)
-        labels = self.get_labels(example_id, crop_slice)
 
         return (data, labels)
 
@@ -99,9 +107,13 @@ class DreyeveExamples(Examples):
         _close_video(vid112)
         _close_video(vid448)
 
-        return [clip_cropped,
-                clip_resized,
-                last_frame]
+        if not self.predict:
+            return [clip_cropped,
+                    clip_resized,
+                    last_frame]
+        else:
+            return [clip_resized,
+                    last_frame]
 
 
     def get_labels(self, example_id, crop_slice=None):
@@ -117,15 +129,21 @@ class DreyeveExamples(Examples):
 
         eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
                 frame_number, self.gaze_frames)
+        assert eye_coords is not []
 
 
         try:
-            attention_resized = attention_map(eye_coords,self.frame_shape,self.gaze_radius,np.exp)
-            attention_cropped = attention_resized[crop_slice]
+            attention = attention_map(eye_coords,self.frame_shape,self.gaze_radius,np.exp)
+            #attention = np.expand_dims(attention,0)
         except ValueError:
             raise ValueError("Example has no ground truth")
 
-        return [attention_cropped, attention_resized]
+        if not self.predict:
+            #attention_cropped = attention[[slice(None),*crop_slice]]
+            attention_cropped = attention[crop_slice]
+            return [attention_cropped, attention]
+
+        return attention
 
     """ Helper functions """
 

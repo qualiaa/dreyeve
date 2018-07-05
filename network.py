@@ -70,6 +70,27 @@ fine_architecture = [
 def coarse_inference(x):
     return apply_sequence(coarse_architecture, x)
 
+def predict_model(weights_file):
+
+    # Fine-tuned network output
+    resized_input = Input(shape=(3,16,112,112),dtype='float32',name="resized_input")
+    resized_output = coarse_inference(resized_input)
+
+    last_frame = Input(shape=(3,448,448),dtype='float32',name="last_frame")
+    resized_output = K.expand_dims(resized_output,1)
+    resized_output = UpSampling2D(size=(4,4),data_format=data_format)(
+            resized_output)
+
+    fine_input = concatenate([last_frame,resized_output],axis=1)
+    fine_output = apply_sequence(fine_architecture, fine_input)
+
+    # Build model
+    model = Model(inputs=[resized_input,last_frame],
+                  outputs=[fine_output])
+
+    model.load_weights(weights_file)
+
+    return model
 
 def model(weights_file = None):
     data_format = "channels_first"
