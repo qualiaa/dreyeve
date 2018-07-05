@@ -1,4 +1,5 @@
 import keras.backend as K
+import numpy as np
 
 def kl_divergence(y_true, y_pred):
     eps = K.epsilon() # 1.19e-07
