@@ -19,3 +19,4 @@ VALIDATION_SPLIT = 0.1
 # ratio of all files for train
 TRAIN_SPLIT = 0.8
 
+EPS = 1.19e-07
