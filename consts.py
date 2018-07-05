@@ -1,3 +1,6 @@
+TB_DIR = "tensorboard"
+CHECKPOINT_DIR = "checkpoints"
+
 BATCH_SIZE = 16
 WORKERS = 4
 USE_MULTIPROCESSING = True
@@ -16,5 +19,3 @@ VALIDATION_SPLIT = 0.1
 # ratio of all files for train
 TRAIN_SPLIT = 0.8
 
-LOG_DIR = "logs"
-CHECKPOINT_DIR = "checkpoints"

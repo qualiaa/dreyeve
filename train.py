@@ -49,7 +49,7 @@ def train(gaze_radius = 16, gaze_frames = 16):
             save_weights_only=True,
             period=2),
         TensorBoard(
-            log_dir=c.LOG_DIR+
+            log_dir=c.TB_DIR+
                 "/{:d}_{:d}".format(gaze_radius,gaze_frames),
             #histogram_freq=10,
             batch_size=c.BATCH_SIZE,write_images=True,
