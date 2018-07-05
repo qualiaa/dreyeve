@@ -22,8 +22,8 @@ class KerasSequenceWrapper(Sequence):
         self.batch_size = batch_size
         self.examples = cls(*args,**kargs)
 
-    def __getitem__(self,batch_n):
-        return self.examples.get_batch(self.batch_size,batch_n)
+    def __getitem__(self,batch_index):
+        return self.examples.get_batch(self.batch_size,batch_index)
 
     def __len__(self):
         return self.examples.n_batches(self.batch_size)
@@ -72,26 +72,26 @@ class Examples(ABC):
     def epoch(self):
         return self.example_queue.epoch
 
-    def get_batch(self, batch_size, batch_n):
+    def get_batch(self, batch_size, batch_index):
         n_batches = self.n_batches(batch_size)
         n_examples = len(self)
-        if batch_n >= n_batches:
-            raise IndexError("Batch",batch_n,"exceeds number of batches",n_batches)
+        if batch_index >= n_batches:
+            raise IndexError("Batch",batch_index,"exceeds number of batches",n_batches)
         batch = []
-        i = batch_size*batch_n
+        example_index = batch_size * batch_index
         while len(batch) < batch_size:
-            if i >= n_examples: 
-                raise IndexError("Batch",batch_n,"of",n_batches,"exceeded number of examples")
+            if example_index >= n_examples: 
+                raise IndexError("Batch",batch_index,"of",n_batches,"exceeded number of examples")
             try:
-                index=(self.example_queue.container[i])
-                batch.append(self.get_example(index))
+                real_index=(self.example_queue.container[example_index])
+                batch.append(self.get_example(real_index))
             except tuple(self.exception_handlers.keys()) as e:
-                self.exception_handlers[type(e)](e,index)
+                self.exception_handlers[type(e)](e,real_index)
             except Exception as e:
-                print("Exception raised for example {:d}".format(index))
-                e.args += (index,)
+                print("Exception raised for example {:d}".format(real_index))
+                e.args += (real_index,)
                 raise e
-            i += 1
+            example_index += 1
     
         def stack(x):
             if isinstance(x[0],(list,tuple)):
