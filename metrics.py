@@ -3,11 +3,19 @@ import numpy as np
 
 import consts as c
 
+def _normalize(x):
+    x_min = K.min(x, axis=[1,2], keepdims=True)
+    # this line isn't necessary if last layer is a ReLU
+    #x -= (x_min - K.abs(x_min)) / 2
+    x /= K.sum(x, axis=[1,2], keepdims=True)
+    return x
+
 def kl_divergence(y_true, y_pred):
+    y_pred = _normalize(y_pred)
     eps = K.epsilon() # 1.19e-07
-    denom = (eps + y_true)
-    ratio = y_pred/denom
-    return K.sum(K.tf.multiply(y_pred,K.log(eps + ratio)))
+    denom = (eps + y_pred)
+    ratio = y_true/denom
+    return K.sum(K.tf.multiply(y_true,K.log(eps + ratio)))
 
 
 def cross_correlation(y_true, y_pred):
