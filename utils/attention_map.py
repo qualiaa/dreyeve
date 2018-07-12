@@ -5,41 +5,63 @@ from scipy import signal
 
 from .stamp import stamp
 
-def attention_map(clip_coords, output_shape, point_radius=0, decay_fn=None):
-    if type(clip_coords) == tuple:
-        if len(clip_coords) != 2:
-            raise TypeError("Attention map expects single coordinate pair,"
-                    "np.ndarray of coordinate pairs, or list of np.ndarray per frame.",
-                clip_coords)
-        clip_coords = np.array(clip_coords)
-    if type(clip_coords) == np.ndarray:
-        clip_coords = [clip_coords]
-    if len(clip_coords) == 0: raise ValueError("No coords for attention map",
-            clip_coords)
-    if type(clip_coords[0]) != np.ndarray:
-        raise TypeError("Attention map expects single coordinate pair,"
-                "np.ndarray of coordinate pairs, or list of np.ndarray per frame",
-            clip_coords)
+def _attention_map(frame_coords, output_shape, point_radius=0):
+    if type(frame_coords) == tuple:
+        frame_coords = np.array(frame_coords)
+
+    if type(frame_coords) != np.ndarray or frame_coords.shape[1] != 2:
+        raise TypeError("attention_map expects single coordinate pair or "
+                "numpy.ndarray of coordinate pairs",
+                frame_coords)
 
     if point_radius >= 1:
         brush = gaussian_2d(point_radius * 2 + 1)
 
     # scale eye coordinates
-    clip_coords = np.array(list(map(lambda c: eye_data.scale_to_shape(c, output_shape), clip_coords)))
+    frame_coords = np.array(list(map(lambda c: eye_data.scale_to_shape(c,
+        output_shape), frame_coords)))
 
     attention_map = np.zeros(output_shape)
 
-    for i, frame_coords in enumerate(clip_coords):
+    for coord_pair in frame_coords:
+        if point_radius < 1:
+            brush = bilinear_1px(coord_pair)
+        stamp(attention_map, coord_pair, brush, out=attention_map)
+
+    return attention_map
+
+
+def multiframe_attention_map(
+        clip_coords_list : list,
+        agg_method=np.max,
+        decay_fn=None,
+        *args, **kargs):
+    """
+    if type(clip_coords) == np.ndarray:
+        clip_coords = [clip_coords]
+        """
+    if len(clip_coords_list) == 0:
+        raise ValueError("No coords for attention map", clip_coords_list)
+    if type(clip_coords_list[0]) != np.ndarray:
+        raise TypeError("multiframe_attention_map expects list containing one "
+                "(?,2) np.ndarray for each frame",
+                clip_coords_list)
+
+    attention_maps = []
+
+    for i, frame_coords in enumerate(clip_coords_list):
         weight, x = 1, 1
 
         if decay_fn is not None and len(clip_coords) > 1:
             x = i/(len(clip_coords) - 1)
             weight = decay_fn(x)
 
-        for coord_pair in frame_coords:
-            if point_radius < 1:
-                brush = bilinear_1px(coord_pair)
-            stamp(attention_map, coord_pair, brush * weight, out=attention_map)
+        attention_map = _attention_map(frame_coords, *args, **kargs)
+        attention_maps.append(weight * attention_map)
+
+    attention_maps = np.stack(attention_maps)
+
+    attention_map = agg_method(attention_maps,axis=0)
 
     attention_sum = attention_map.sum()
     if attention_sum > 0:
@@ -47,10 +69,11 @@ def attention_map(clip_coords, output_shape, point_radius=0, decay_fn=None):
     return attention_map
 
 
-def gaussian_2d(size):
-    assert size % 2 == 1
-    sd=(size-1)/6
-    g = np.expand_dims(signal.gaussian(size,sd),0)
+def gaussian_2d(pixel_size):
+    sigma_per_side = 4
+    assert pixel_size % 2 == 1
+    sigma=(pixel_size-1)/(2 * sigma_per_side)
+    g = np.expand_dims(signal.gaussian(pixel_size,sigma),0)
     return np.matmul(g.T, g)
 
 

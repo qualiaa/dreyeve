@@ -10,10 +10,11 @@ from imageio.core.format import CannotReadFrameError
 from pims import ImageIOReader as Reader
 from skimage.transform import resize
 
-from utils.attention_map import attention_map
+from utils.attention_map import multiframe_attention_map
 from utils.Examples import Examples
 from utils.random_crop_slice import random_crop_slice
 import eye_data
+import settings
 from consts import *
 
 class DreyeveExamples(Examples):
@@ -22,13 +23,9 @@ class DreyeveExamples(Examples):
 
     def __init__(self,
                  folders,
-                 gaze_radius=16,
-                 gaze_frames=1,
                  predict=False,
                  frames_per_example=16,
                  seed=None):
-        self.gaze_radius = gaze_radius
-        self.gaze_frames = gaze_frames
         self.predict = predict
         self.frames_per_example=frames_per_example
 
@@ -128,12 +125,16 @@ class DreyeveExamples(Examples):
                     self.example_shape, self._rand)
 
         eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
-                frame_number, self.gaze_frames)
+                frame_number, settings.attention_map_frames)
         assert eye_coords is not []
 
 
         try:
-            attention = attention_map(eye_coords,self.frame_shape,self.gaze_radius,np.exp)
+            attention = multiframe_attention_map(
+                    eye_coords,
+                    output_shape=self.frame_shape,
+                    point_radius=settings.gaze_radius,
+                    agg_method=settings.attention_map_aggregation())
             #attention = np.expand_dims(attention,0)
         except ValueError:
             raise ValueError("Example has no ground truth")
