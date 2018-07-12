@@ -51,7 +51,7 @@ coarse_architecture = [
     BN(), C2(64),  LeakyReLU(0.001), U2(), #56
     BN(), C2(32),  LeakyReLU(0.001), U2(), #112
     BN(), C2(16),  LeakyReLU(0.001),
-    BN(), C2(1), LeakyReLU(0.001),
+    BN(), C2(1), Activation("relu"),
     Reshape((112,112))
 ]
 
