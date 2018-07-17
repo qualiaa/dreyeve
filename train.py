@@ -90,16 +90,24 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+            "--centre",
+            action="store_true")
+    parser.add_argument(
             "--loss",
             default="kl",
             choices=settings.loss_metrics.keys())
+    parser.add_argument(
+            "--agg",
+            default="max",
+            choices=settings.agg_functions.keys())
     parser.add_argument("gaze_settings",nargs="+",type=extract_gaze_settings)
 
     args = vars(parser.parse_args())
 
-    settings.loss_function_name = args["loss"]
-
-    gaze_settings_list = args["gaze_settings"]
+    settings.loss_function_name             = args["loss"]
+    settings.centre_attention_map_frames    = args["centre"]
+    settings.attention_map_aggregation_name = args["agg"]
+    gaze_settings_list                      = args["gaze_settings"]
 
     for radius, frames in gaze_settings_list:
         settings.gaze_radius = radius
