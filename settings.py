@@ -39,12 +39,19 @@ def run_name():
             radius=gaze_radius,
             frames=attention_map_frames)
 
-def parse_run_name(run_name):
-    match = re.fullmatch("(centred_)?([^_]*)_([^_]*)_(\d+)_(\d+)",run_name)
 
+
+def parse_run_name(run_name):
+    global gaze_radius
+    global attention_map_frames
+    global attention_map_aggregation_name
+    global loss_function_name
+    global centre_attention_map_frames
+
+    match = re.fullmatch("(centred_)?([^_]*)_([^_]*)_(\d+)_(\d+)",run_name)
     centre_attention_map_frames = match.groups()[0] is not None
 
     attention_map_aggregation_name = match.groups()[1]
     loss_function_name = match.groups()[2]
-    gaze_radius = match.groups()[3]
-    attention_map_frames  = match.groups()[4]
+    gaze_radius = int(match.groups()[3])
+    attention_map_frames  = int(match.groups()[4])
