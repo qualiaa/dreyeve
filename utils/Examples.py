@@ -83,7 +83,7 @@ class Examples(ABC):
             if example_index >= n_examples: 
                 raise IndexError("Batch",batch_index,"of",n_batches,"exceeded number of examples")
             try:
-                real_index=(self.example_queue.container[example_index])
+                real_index=(self.example_queue[example_index])
                 batch.append(self.get_example(real_index))
             except tuple(self.exception_handlers.keys()) as e:
                 self.exception_handlers[type(e)](e,real_index)
@@ -125,7 +125,7 @@ class Examples(ABC):
     def next_batch(self,batch_size):
         batch=[]
 
-        if len(self.example_queue.container) < batch_size:
+        if len(self.example_queue.data) < batch_size:
             raise ValueError("Batch size",batch_size,"exceeds number of examples")
         if len(self.example_queue) < batch_size:
             self.example_queue.next_epoch()
