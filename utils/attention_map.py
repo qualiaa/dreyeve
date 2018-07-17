@@ -3,9 +3,12 @@ import eye_data
 import consts as c
 from scipy import signal
 
-from .stamp import stamp
+from . import stamp
 
-def _attention_map(frame_coords, output_shape, point_radius=0):
+def _attention_map(frame_coords,
+                   output_shape,
+                   point_radius=0,
+                   stamp_fn=stamp.stamp_max):
     if type(frame_coords) == tuple:
         frame_coords = np.array(frame_coords)
 
@@ -26,7 +29,10 @@ def _attention_map(frame_coords, output_shape, point_radius=0):
     for coord_pair in frame_coords:
         if point_radius < 1:
             brush = bilinear_1px(coord_pair)
-        stamp(attention_map, coord_pair, brush, out=attention_map)
+        stamp_fn(attention_map,
+                 coord_pair,
+                 brush,
+                 out=attention_map)
 
     return attention_map
 
@@ -49,6 +55,10 @@ def multiframe_attention_map(
 
     attention_maps = []
 
+    if agg_method==np.max: stamp_fn=stamp.stamp_max
+    elif agg_method==np.sum: stamp_fn=stamp.stamp_add
+    else: raise ValueError("Unexpected aggregation method")
+
     for i, frame_coords in enumerate(clip_coords_list):
         weight, x = 1, 1
 
@@ -56,7 +66,8 @@ def multiframe_attention_map(
             x = i/(len(clip_coords) - 1)
             weight = decay_fn(x)
 
-        attention_map = _attention_map(frame_coords, *args, **kargs)
+        attention_map = _attention_map(frame_coords, stamp_fn=stamp_fn,
+                *args, **kargs)
         attention_maps.append(weight * attention_map)
 
     attention_maps = np.stack(attention_maps)
