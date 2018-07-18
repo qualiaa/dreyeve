@@ -113,20 +113,28 @@ class DreyeveExamples(Examples):
 
     def get_labels(self, example_id, crop_slice=None):
         vid_id,frame_number = self._get_video_and_frame_number_from_id(example_id)
+
+        """
         if frame_number+1 < self.frames_per_example:
             raise IndexError(
                     "Frame {} below frames_per_example "
                     "for video {}".format(frame_number,vid_id))
+        """
 
-        if crop_slice is None:
-            crop_slice = random_crop_slice(self.frame_shape,
-                    self.example_shape, self._rand)
+        # retrieve gaze points from multiple frames
+        if settings.centre_attention_map_frames:
+            assert settings.attention_map_frames % 2 == 1
+            start_frame = frame_number - (settings.attention_map_frames-1)//2
+        else:
+            start_frame = frame_number - settings.attention_map_frames + 1
 
         eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
-                frame_number, settings.attention_map_frames)
+                start_frame=start_frame
+                num_frames=settings.attention_map_frames)
         assert eye_coords is not []
 
 
+        # generate attention map from gaze points
         try:
             attention = multiframe_attention_map(
                     eye_coords,
