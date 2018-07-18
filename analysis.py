@@ -1,19 +1,40 @@
 #!/usr/bin/env python3
 
+import argparse
 import random
 import re
 from glob import glob
+from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import keras.backend as K
 
 import network
+import settings
 import consts as c
 import utils.pkl_xz as pkl_xz
-from DreyeveExamples import DreyeveExamples
 from metrics import kl_vis, cc_vis
 from utils.Examples import KerasSequenceWrapper
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--png", action="store_true")
+parser.add_argument("history_files", nargs="*")
+args = vars(parser.parse_args())
+files = args["history_files"]
+if len(files) == 0:
+    files = glob("history*.pkl.xz")
+save_png = args["png"]
+output_path = Path("figures")
+
+if save_png:
+    import matplotlib as mpl
+    mpl.use("AGG")
+    if not output_path.exists():
+        output_path.mkdir()
+import matplotlib.pyplot as plt
+
+# must set MPL backend before importing DreyeveExamples, as pims imports MPL
+from DreyeveExamples import DreyeveExamples
 
 seed = 7
 random.seed(seed)
@@ -25,73 +46,117 @@ video_folders = glob(c.DATA_DIR + "/[0-9][0-9]")
 train_split = int(c.TRAIN_SPLIT * len(video_folders))
 validation_split = int(c.VALIDATION_SPLIT * train_split)
 
+def wait():
+    print("Press enter to continue...")
+    input()
+
+for f in files:
+    hist = pkl_xz.load(f)
+    # keys dict_keys(['val_loss', 'val_coarse_output_loss',
+    # 'val_fine_output_loss', 'loss', 'coarse_output_loss', 'fine_output_loss'])
+
+    loss_c = hist["coarse_output_loss"]
+    loss_f = hist["fine_output_loss"]
+    loss_c_val = hist["val_coarse_output_loss"]
+    loss_f_val = hist["val_fine_output_loss"]
+
+    fig = plt.figure()
+    ax = plt.subplot(121)
+    ax.title.set_text("train")
+    ax.plot(loss_c[1:])
+    ax.plot(loss_f[1:])
+    ax = plt.subplot(122)
+    ax.title.set_text("validation")
+    ax.plot(loss_c_val[1:])
+    ax.plot(loss_f_val[1:])
+
+    if save_png:
+        match = re.fullmatch("history_(.*).pkl.xz",f)
+        fig.savefig(output_path/(match.groups()[0]+"_loss.png"))
+    else:
+        fig.show()
+        wait()
+    plt.close(fig)
+
+
 train_folders = video_folders[:train_split][:-validation_split]
 validation_folders = video_folders[:train_split][-validation_split:]
 #test_folders = video_folders[train_split:]
 
-train = DreyeveExamples(train_folders)
-val = DreyeveExamples(validation_folders)
+train = DreyeveExamples(train_folders,seed=seed)
 
-files = glob("history*pkl.xz")
 
 for f in files:
-    match = re.fullmatch("history_(\d)_(\d).pkl.xz",f)
-    radius, frames = [int(x) for x in match.groups()]
-    hist = pkl_xz.load(f)
+    print(f)
+    match = re.fullmatch("history_(.*).pkl.xz",f)
+    settings.parse_run_name(match.groups()[0])
 
-    train.gaze_radius = radius
-    train.gaze_frames = frames
-    val.gaze_radius = radius
-    val.gaze_frames = frames
+    model = network.model("weights_"+settings.run_name() +".h5")
 
-    model = network.model("weights_{:d}_{:d}.h5".format(radius,frames))
-
-    X_train, Y_true = train.get_example(0)
-    X_train = [X[None,:] for X in X_train]
-    X_train_c, X_train_f, _ = X_train
-    Y_true_c, Y_true_f = Y_true
-    Y_pred_c, Y_pred_f = model.predict(X_train,batch_size=1)
-    kl_c = kl_vis(Y_true_c, Y_pred_c)
-    kl_f = kl_vis(Y_true_f, Y_pred_f)
-    cc_c = cc_vis(Y_true_c, Y_pred_c)
-    cc_f = cc_vis(Y_true_f, Y_pred_f)
-
-    fig = plt.figure()
-
-    ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=2)
-    ax1.imshow(X_train_c)
-    ax2 = plt.subplot2grid((4, 4), (1, 0), colspan=2)
-    ax2.imshow(X_train_f)
-
-    ax3 = plt.subplot2grid((4, 4), (0, 2))
-    ax3.imshow(Y_true_c)
-    ax4 = plt.subplot2grid((4, 4), (0, 3))
-    ax4.imshow(Y_true_f)
-    ax5 = plt.subplot2grid((4, 4), (1, 2))
-    ax5.imshow(Y_pred_c)
-    ax6 = plt.subplot2grid((4, 4), (1, 3))
-    ax6.imshow(Y_pred_f)
-
-    ax7 = plt.subplot2grid((4, 4), (2, 0), colspan=2)
-    ax7.imshow(kl_c)
-    ax8 = plt.subplot2grid((4, 4), (3, 0), colspan=2)
-    ax8.imshow(kl_f)
-
-    ax9 = plt.subplot2grid((4, 4), (2, 2), colspan=2)
-    ax9.imshow(cc_c)
-    ax10 = plt.subplot2grid((4, 4), (3, 2), colspan=2)
-    ax10.imshow(cc_f)
-
-    fig.show()
+    # show at most 5 examples
+    for shuffled_index in range(5):
+        example_id = train.example_queue[shuffled_index]
+        X_train, Y_true = train.get_example(example_id)
+        X_train_c, X_train_f = [np.moveaxis(X[:,-1,...],0,2) for X in X_train[:2]]
+        X_train_c, X_train_f = [(X - X.min())/(X.max()-X.min()) for X in [X_train_c, X_train_f]]
+        X_train = [X[None,:] for X in X_train]
+        Y_true_c, Y_true_f = Y_true
+        Y_pred_c, Y_pred_f = model.predict(X_train,batch_size=1)
+        """
+        print(X_train_c.shape, X_train_f.shape)
+        print((X_train_f.min(), X_train_f.max()))
+        """
+        Y_pred_c, Y_pred_f = [np.squeeze(Y) for Y in [Y_pred_c, Y_pred_f]]
+        Y_pred_c, Y_pred_f = [(Y-Y.min())/(c.EPS + (Y-Y.min()).sum()) for Y in [Y_pred_c, Y_pred_f]]
 
 
+        kl_c = kl_vis(Y_true_c, Y_pred_c)
+        """
+        print(kl_c.shape)
+        print(kl_c.dtype)
+        print(kl_c.max(),kl_c.min())
+        """
+        kl_f = kl_vis(Y_true_f, Y_pred_f)
+        cc_c = cc_vis(Y_true_c, Y_pred_c)
+        cc_f = cc_vis(Y_true_f, Y_pred_f)
 
+        fig = plt.figure(figsize=(20,20), dpi=80)
 
-    
+        ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=2)
+        ax1.imshow(X_train_c)
+        ax2 = plt.subplot2grid((4, 4), (1, 0), colspan=2)
+        ax2.imshow(X_train_f)
 
-    print(hist.keys())
+        ax3 = plt.subplot2grid((4, 4), (0, 2))
+        ax3.imshow(Y_true_c)
+        ax5 = plt.subplot2grid((4, 4), (0, 3))
+        ax5.imshow(Y_pred_c)
+        ax4 = plt.subplot2grid((4, 4), (1, 2))
+        ax4.imshow(Y_true_f)
+        ax6 = plt.subplot2grid((4, 4), (1, 3))
+        ax6.imshow(Y_pred_f)
 
-    """
-    fig = plt.figure()
-    fig.plot
-    """
+        ax7 = plt.subplot2grid((4, 4), (2, 0), colspan=2)
+        ax7.title.set_text("Cropped KL Divergence")
+        ax7.imshow(kl_c)
+        ax8 = plt.subplot2grid((4, 4), (3, 0), colspan=2)
+        ax8.title.set_text("KL Divergence")
+        ax8.imshow(kl_f)
+
+        ax9 = plt.subplot2grid((4, 4), (2, 2), colspan=2)
+        ax9.title.set_text("Cropped Correlation Coefficient")
+        ax9.imshow(cc_c)
+        ax10 = plt.subplot2grid((4, 4), (3, 2), colspan=2)
+        ax10.title.set_text("Correlation Coefficient")
+        ax10.imshow(cc_f)
+
+        if save_png:
+            fig.savefig((output_path/(match.groups()[0] +
+                "_example_{:d}.png".format(shuffled_index))))
+            plt.close(fig)
+        else:
+            fig.show()
+            print("Show next? [y/N]")
+            ans = input().lower()
+            plt.close(fig)
+            if ans == "y": break
