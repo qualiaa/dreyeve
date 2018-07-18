@@ -129,7 +129,7 @@ class DreyeveExamples(Examples):
             start_frame = frame_number - settings.attention_map_frames + 1
 
         eye_coords = eye_data.get_consecutive_frames(self.eye_positions[vid_id],
-                start_frame=start_frame
+                start_frame=start_frame,
                 num_frames=settings.attention_map_frames)
         assert eye_coords is not []
 

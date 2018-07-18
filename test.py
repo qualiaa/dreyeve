@@ -17,7 +17,7 @@ from DreyeveExamples import DreyeveExamples
 from metrics import cross_correlation, kl_divergence
 
 def test(filename):
-    match = re.fullmatch("weights_(.*).pkl.xz",f)
+    match = re.fullmatch("weights_(.*).pkl.xz",filename)
     settings.parse_run_name(match.groups()[0])
 
     # load model
