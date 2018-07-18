@@ -80,10 +80,6 @@ class DreyeveExamples(Examples):
     def get_data(self, example_id, crop_slice=None):
         vid_id,frame_number = self._get_video_and_frame_number_from_id(example_id)
 
-        if crop_slice is None:
-            crop_slice = random_crop_slice(self.frame_shape,
-                    self.example_shape, self._rand)
-
         if frame_number+1 < self.frames_per_example:
             raise IndexError(
                     "Frame {} below frames_per_example "
@@ -96,7 +92,6 @@ class DreyeveExamples(Examples):
 
         clip = _get_frame_tensor(vid448, frame_number, mf448)
 
-        clip_cropped = clip[[slice(None),slice(None),*crop_slice]]
         clip_resized = _get_frame_tensor(vid112, frame_number, mf112)
         last_frame = clip[:,-1,...]
 
@@ -105,6 +100,9 @@ class DreyeveExamples(Examples):
         _close_video(vid448)
 
         if not self.predict:
+            if crop_slice is None:
+                raise ValueError("crop_slice must be provided")
+            clip_cropped = clip[[slice(None),slice(None),*crop_slice]]
             return [clip_cropped,
                     clip_resized,
                     last_frame]
@@ -139,7 +137,12 @@ class DreyeveExamples(Examples):
         except ValueError:
             raise ValueError("Example has no ground truth")
 
+
+        # if not used for prediction, need to generate a cropped version
         if not self.predict:
+            if crop_slice is None:
+                raise ValueError("crop_slice must be provided")
+
             #attention_cropped = attention[[slice(None),*crop_slice]]
             attention_cropped = attention[crop_slice]
             return [attention_cropped, attention]
