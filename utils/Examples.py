@@ -135,3 +135,61 @@ class Examples(ABC):
         batch = map(np.stack,zip(*batch))
 
         return examples
+
+class Batch:
+    def __init__(self, examples, batch_size):
+        self.examples = examples
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return len(self.examples) // self.batch_size
+
+    def __getitem__(self, i):
+        return self.examples[i]
+
+    def __iter__(self):
+        batch=[]
+
+        if len(self.examples.example_queue.data) < self.batch_size:
+            raise ValueError("Batch size",self.batch_size,"exceeds number of examples")
+
+        for example in self.examples:
+            batch.extend(islice(iter(examples),batch_size))
+            batch = map(np.stack,zip(*batch))
+            yield batch
+
+class Shuffle:
+    def __init__(self, examples, rand=random):
+        self.examples = examples
+        self.rand = random
+        self.order = list(range(len(examples)))
+        self.rand.shuffle(self.order)
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self,i):
+        return self.examples[self.order[i]]
+
+    def __iter__(self):
+        for i in self.order:
+            yield self.examples[i]
+        self.rand.shuffle(self.order)
+
+
+# could alternatively do chain(repeat(examples, num_epochs))
+class Epoch:
+    def __init__(self, examples, epochs):
+        self.examples = examples
+        self.epochs = epochs
+
+    def __len__(self):
+        return len(self.examples) * self.epochs
+
+    def __getitem__(self, i):
+        return self.examples[i]
+
+    def __iter__(self):
+        for _ in range(epochs):
+            for example in self.examples:
+                yield example
