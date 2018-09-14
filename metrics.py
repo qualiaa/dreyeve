@@ -31,7 +31,7 @@ def kl_vis(y_true, y_pred):
     eps = c.EPS
     Q = y_true
     P = y_pred
-    return y_pred * np.log(eps + Q/(eps + P))
+    return Q * np.log(eps + Q/(eps + P))
 
 def cc_vis(y_true, y_pred):
     return y_true * y_pred / np.sqrt(np.sum(y_true**2 + y_pred**2))
