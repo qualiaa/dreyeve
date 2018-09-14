@@ -29,8 +29,7 @@ output_path = Path("figures")
 if save_png:
     import matplotlib as mpl
     mpl.use("AGG")
-    if not output_path.exists():
-        output_path.mkdir()
+    output_path.mkdir(exist_ok=True)
 import matplotlib.pyplot as plt
 
 # must set MPL backend before importing DreyeveExamples, as pims imports MPL
@@ -51,6 +50,9 @@ def wait():
     input()
 
 for f in files:
+    match = re.fullmatch("history_(.*).pkl.xz",f)
+    title = match.groups()[0]
+
     hist = pkl_xz.load(f)
     # keys dict_keys(['val_loss', 'val_coarse_output_loss',
     # 'val_fine_output_loss', 'loss', 'coarse_output_loss', 'fine_output_loss'])
@@ -60,22 +62,46 @@ for f in files:
     loss_c_val = hist["val_coarse_output_loss"]
     loss_f_val = hist["val_fine_output_loss"]
 
-    fig = plt.figure()
-    ax = plt.subplot(121)
-    ax.title.set_text("train")
-    ax.plot(loss_c[1:])
-    ax.plot(loss_f[1:])
-    ax = plt.subplot(122)
-    ax.title.set_text("validation")
-    ax.plot(loss_c_val[1:])
-    ax.plot(loss_f_val[1:])
+    def plot1(ax):
+        ax.plot(loss_c[1:])
+        ax.plot(loss_f[1:])
+        ax.set_yticklabels("loss")
+        ax.set_xticklabels("epoch")
+
+    def plot2(ax):
+        ax.plot(loss_c_val[1:])
+        ax.plot(loss_f_val[1:])
+        ax.set_yticklabels("loss")
+        ax.set_xticklabels("epoch")
+
 
     if save_png:
-        match = re.fullmatch("history_(.*).pkl.xz",f)
-        fig.savefig(output_path/(match.groups()[0]+"_loss.png"))
+        path = output_path/title
+        path.mkdir(exist_ok=True)
+        train_path, val_path = [
+                (path/mode).with_suffix(".png")
+                for mode in ["train", "val"]]
+        fig = plt.figure()
+        fig.suptitle("train")
+        plot1(fig.gca())
+        fig.savefig(train_path)
+        fig = plt.figure()
+        fig.suptitle("validation")
+        plot2(fig.gca())
+        fig.savefig(val_path)
+
     else:
+        fig = plt.figure()
+        fig.suptitle(title)
+        ax = fig.add_subplot(121)
+        ax.title.set_text("train")
+        plot1(ax)
+        ax = fig.add_subplot(122)
+        ax.title.set_text("validation")
+        plot2(ax)
         fig.show()
         wait()
+
     plt.close(fig)
 
 
@@ -89,7 +115,8 @@ train = DreyeveExamples(train_folders,seed=seed)
 for f in files:
     print(f)
     match = re.fullmatch("history_(.*).pkl.xz",f)
-    settings.parse_run_name(match.groups()[0])
+    title=match.groups()[0]
+    settings.parse_run_name(title)
 
     model = network.model("weights_"+settings.run_name() +".h5")
 
@@ -163,8 +190,8 @@ for f in files:
         fig.colorbar(im,ax=ax10)
 
         if save_png:
-            fig.savefig((output_path/(match.groups()[0] +
-                "_example_{:d}.png".format(shuffled_index))))
+            fig.savefig(output_path/title/
+                "example_{:d}.png".format(shuffled_index))
             plt.close(fig)
         else:
             fig.show()
