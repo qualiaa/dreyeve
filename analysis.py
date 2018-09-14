@@ -107,7 +107,7 @@ for f in files:
         print((X_train_f.min(), X_train_f.max()))
         """
         Y_pred_c, Y_pred_f = [np.squeeze(Y) for Y in [Y_pred_c, Y_pred_f]]
-        Y_pred_c, Y_pred_f = [(Y-Y.min())/(c.EPS + (Y-Y.min()).sum()) for Y in [Y_pred_c, Y_pred_f]]
+        Y_pred_c, Y_pred_f = [Y/Y.sum() for Y in [Y_pred_c, Y_pred_f]]
 
 
         kl_c = kl_vis(Y_true_c, Y_pred_c)
@@ -121,6 +121,7 @@ for f in files:
         cc_f = cc_vis(Y_true_f, Y_pred_f)
 
         fig = plt.figure(figsize=(20,20), dpi=80)
+        fig.suptitle("{} example {:d}".format(f, shuffled_index))
 
         ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=2)
         ax1.imshow(X_train_c)
@@ -136,19 +137,30 @@ for f in files:
         ax6 = plt.subplot2grid((4, 4), (1, 3))
         ax6.imshow(Y_pred_f)
 
+        def centred_graph(ax, array):
+            x = np.abs(array).max()
+            im = ax.imshow(array, vmin=-x,vmax=x,cmap=plt.get_cmap("seismic"))
+            fig.colorbar(im,ax=ax)
+            plt.annotate("Val: {}".format(array.sum()),
+                    xy=(10,10),
+                    xycoords="axes points")
+
+
         ax7 = plt.subplot2grid((4, 4), (2, 0), colspan=2)
         ax7.title.set_text("Cropped KL Divergence")
-        ax7.imshow(kl_c)
+        centred_graph(ax7, kl_c)
         ax8 = plt.subplot2grid((4, 4), (3, 0), colspan=2)
         ax8.title.set_text("KL Divergence")
-        ax8.imshow(kl_f)
+        centred_graph(ax8, kl_f)
 
         ax9 = plt.subplot2grid((4, 4), (2, 2), colspan=2)
         ax9.title.set_text("Cropped Correlation Coefficient")
-        ax9.imshow(cc_c)
+        im = ax9.imshow(cc_c)
+        fig.colorbar(im,ax=ax9)
         ax10 = plt.subplot2grid((4, 4), (3, 2), colspan=2)
         ax10.title.set_text("Correlation Coefficient")
-        ax10.imshow(cc_f)
+        im = ax10.imshow(cc_f)
+        fig.colorbar(im,ax=ax10)
 
         if save_png:
             fig.savefig((output_path/(match.groups()[0] +
