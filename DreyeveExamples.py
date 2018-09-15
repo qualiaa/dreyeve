@@ -23,10 +23,10 @@ class DreyeveExamples(Examples):
 
     def __init__(self,
                  folders,
-                 predict=False,
+                 train=True,
                  frames_per_example=16,
                  seed=None):
-        self.predict = predict
+        self.train = train
         self.frames_per_example=frames_per_example
 
         print("Loading eye data...")
@@ -67,7 +67,7 @@ class DreyeveExamples(Examples):
         crop_slice = random_crop_slice(self.frame_shape,
                 self.example_shape, self._rand)
         labels = self.get_labels(example_id, crop_slice)
-        if not self.predict:
+        if self.train:
             while labels[0].sum() < EPS:
                 crop_slice = random_crop_slice(self.frame_shape,
                         self.example_shape, self._rand)
@@ -99,7 +99,7 @@ class DreyeveExamples(Examples):
         _close_video(vid112)
         _close_video(vid448)
 
-        if not self.predict:
+        if self.train:
             if crop_slice is None:
                 raise ValueError("crop_slice must be provided")
             clip_cropped = clip[[slice(None),slice(None),*crop_slice]]
@@ -147,7 +147,7 @@ class DreyeveExamples(Examples):
 
 
         # if not used for prediction, need to generate a cropped version
-        if not self.predict:
+        if self.train:
             if crop_slice is None:
                 raise ValueError("crop_slice must be provided")
 
