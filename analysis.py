@@ -65,14 +65,17 @@ for f in files:
     def plot1(ax):
         ax.plot(loss_c[1:])
         ax.plot(loss_f[1:])
-        ax.set_yticklabels("loss")
-        ax.set_xticklabels("epoch")
+        ax.set_ylabel("loss")
+        ax.set_xlabel("epoch")
 
     def plot2(ax):
         ax.plot(loss_c_val[1:])
         ax.plot(loss_f_val[1:])
-        ax.set_yticklabels("loss")
-        ax.set_xticklabels("epoch")
+        ax.set_ylabel("loss")
+        ax.set_xlabel("epoch")
+
+    def legend(fig):
+        fig.legend(labels=("coarse","fine"))
 
 
     if save_png:
@@ -82,12 +85,14 @@ for f in files:
                 (path/mode).with_suffix(".png")
                 for mode in ["train", "val"]]
         fig = plt.figure()
-        fig.suptitle("train")
+        fig.suptitle("{} train".format(title))
         plot1(fig.gca())
+        legend(fig)
         fig.savefig(train_path)
         fig = plt.figure()
-        fig.suptitle("validation")
+        fig.suptitle("{} validation".format(title))
         plot2(fig.gca())
+        legend(fig)
         fig.savefig(val_path)
 
     else:
@@ -99,6 +104,7 @@ for f in files:
         ax = fig.add_subplot(122)
         ax.title.set_text("validation")
         plot2(ax)
+        legend(fig)
         fig.show()
         wait()
 
