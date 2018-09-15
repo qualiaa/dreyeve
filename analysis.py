@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import math
 import random
 import re
 from glob import glob
@@ -40,7 +41,7 @@ random.seed(seed)
 np.random.seed(seed)
 K.tf.set_random_seed(seed)
 
-video_folders = glob(c.DATA_DIR + "/[0-9][0-9]")
+video_folders = list(Path(c.DATA_DIR).glob("[0-9][0-9]"))
 
 train_split = int(c.TRAIN_SPLIT * len(video_folders))
 validation_split = int(c.VALIDATION_SPLIT * train_split)
@@ -117,14 +118,16 @@ validation_folders = video_folders[:train_split][-validation_split:]
 
 train = DreyeveExamples(train_folders,seed=seed)
 
+saved_results = []
 
+model = network.model()
 for f in files:
     print(f)
     match = re.fullmatch("history_(.*).pkl.xz",f)
     title=match.groups()[0]
     settings.parse_run_name(title)
+    model.load_weights("weights_"+settings.run_name() +".h5")
 
-    model = network.model("weights_"+settings.run_name() +".h5")
 
     # show at most 5 examples
     for shuffled_index in range(5):
@@ -142,7 +145,6 @@ for f in files:
         Y_pred_c, Y_pred_f = [np.squeeze(Y) for Y in [Y_pred_c, Y_pred_f]]
         Y_pred_c, Y_pred_f = [Y/Y.sum() for Y in [Y_pred_c, Y_pred_f]]
 
-
         kl_c = kl_vis(Y_true_c, Y_pred_c)
         """
         print(kl_c.shape)
@@ -153,55 +155,89 @@ for f in files:
         cc_c = cc_vis(Y_true_c, Y_pred_c)
         cc_f = cc_vis(Y_true_f, Y_pred_f)
 
-        fig = plt.figure(figsize=(20,20), dpi=80)
-        fig.suptitle("{} example {:d}".format(f, shuffled_index))
+        saved_results.append((title, example_id, shuffled_index, X_train_c,
+            X_train_f, Y_true_c, Y_true_f, Y_pred_c, Y_pred_f, kl_c, kl_f, cc_c,
+            cc_f)) 
 
-        ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=2)
-        ax1.imshow(X_train_c)
-        ax2 = plt.subplot2grid((4, 4), (1, 0), colspan=2)
-        ax2.imshow(X_train_f)
+max_kl = None
+max_cc = None
+"""
+max_kl = 0
+max_cc = 0
+for x in saved_results:
+    (title, example_id, shuffled_index, X_train_c, X_train_f, Y_true_c, Y_true_f,
+            Y_pred_c, Y_pref_f, kl_c, kl_f, cc_c, cc_f) = x
 
-        ax3 = plt.subplot2grid((4, 4), (0, 2))
-        ax3.imshow(Y_true_c)
-        ax5 = plt.subplot2grid((4, 4), (0, 3))
-        ax5.imshow(Y_pred_c)
-        ax4 = plt.subplot2grid((4, 4), (1, 2))
-        ax4.imshow(Y_true_f)
-        ax6 = plt.subplot2grid((4, 4), (1, 3))
-        ax6.imshow(Y_pred_f)
+    def get_max(a,b):
+        am = np.abs(a).max()
+        bm = np.abs(b).max()
+        am = am if not math.isnan(am) else -math.inf
+        bm = bm if not math.isnan(bm) else -math.inf
+        return max(am, bm)
+    max_kl = max(max_kl, get_max(kl_c,kl_f))
+    max_cc = max(max_cc, get_max(cc_c,cc_f))
+"""
 
-        def centred_graph(ax, array):
-            x = np.abs(array).max()
-            im = ax.imshow(array, vmin=-x,vmax=x,cmap=plt.get_cmap("seismic"))
-            fig.colorbar(im,ax=ax)
-            plt.annotate("Val: {}".format(array.sum()),
-                    xy=(10,10),
-                    xycoords="axes points")
+for x in saved_results:
+    (title, example_id, shuffled_index, X_train_c, X_train_f, Y_true_c, Y_true_f,
+            Y_pred_c, Y_pref_f, kl_c, kl_f, cc_c, cc_f) = x
+
+    fig = plt.figure(figsize=(20,20), dpi=80)
+    fig.suptitle("{} example {:d}".format(f, shuffled_index))
+
+    ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=2)
+    ax1.imshow(X_train_c)
+    ax2 = plt.subplot2grid((4, 4), (1, 0), colspan=2)
+    ax2.imshow(X_train_f)
+
+    ax3 = plt.subplot2grid((4, 4), (0, 2))
+    ax3.imshow(Y_true_c)
+    ax5 = plt.subplot2grid((4, 4), (0, 3))
+    ax5.imshow(Y_pred_c)
+    ax4 = plt.subplot2grid((4, 4), (1, 2))
+    ax4.imshow(Y_true_f)
+    ax6 = plt.subplot2grid((4, 4), (1, 3))
+    ax6.imshow(Y_pred_f)
+
+    def centred_graph(ax, array, maxval=None):
+        maxval = maxval or np.abs(array).max()
+        im = ax.imshow(array, vmin=-maxval,vmax=maxval,cmap=plt.get_cmap("seismic"))
+        fig.colorbar(im,ax=ax)
+        plt.annotate("Val: {}".format(array.sum()),
+                xy=(10,10),
+                xycoords="axes points")
 
 
-        ax7 = plt.subplot2grid((4, 4), (2, 0), colspan=2)
-        ax7.title.set_text("Cropped KL Divergence")
-        centred_graph(ax7, kl_c)
-        ax8 = plt.subplot2grid((4, 4), (3, 0), colspan=2)
-        ax8.title.set_text("KL Divergence")
-        centred_graph(ax8, kl_f)
+    ax7 = plt.subplot2grid((4, 4), (2, 0), colspan=2)
+    ax7.title.set_text("Cropped KL Divergence")
+    centred_graph(ax7, kl_c, max_kl)
+    ax8 = plt.subplot2grid((4, 4), (3, 0), colspan=2)
+    ax8.title.set_text("KL Divergence")
+    centred_graph(ax8, kl_f, max_kl)
 
-        ax9 = plt.subplot2grid((4, 4), (2, 2), colspan=2)
-        ax9.title.set_text("Cropped Correlation Coefficient")
-        im = ax9.imshow(cc_c)
-        fig.colorbar(im,ax=ax9)
-        ax10 = plt.subplot2grid((4, 4), (3, 2), colspan=2)
-        ax10.title.set_text("Correlation Coefficient")
-        im = ax10.imshow(cc_f)
-        fig.colorbar(im,ax=ax10)
+    ax9 = plt.subplot2grid((4, 4), (2, 2), colspan=2)
+    ax9.title.set_text("Cropped Correlation Coefficient")
+    centred_graph(ax9, cc_c, max_cc)
+    """
+    im = ax9.imshow(cc_c)
+    fig.colorbar(im,ax=ax9)
+    """
+    ax10 = plt.subplot2grid((4, 4), (3, 2), colspan=2)
+    ax10.title.set_text("Correlation Coefficient")
+    centred_graph(ax10, cc_f, max_cc)
+    """
+    im = ax10.imshow(cc_f)
+    fig.colorbar(im,ax=ax10)
+    """
 
-        if save_png:
-            fig.savefig(output_path/title/
-                "example_{:d}.png".format(shuffled_index))
-            plt.close(fig)
-        else:
-            fig.show()
-            print("Show next? [y/N]")
-            ans = input().lower()
-            plt.close(fig)
-            if ans == "y": break
+    if save_png:
+        path = output_path/title
+        path.mkdir(exist_ok=True)
+        fig.savefig(path/"example_{:d}.png".format(shuffled_index))
+        plt.close(fig)
+    else:
+        fig.show()
+        print("Show next? [y/N]")
+        ans = input().lower()
+        plt.close(fig)
+        if ans == "y": break
