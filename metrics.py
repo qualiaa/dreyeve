@@ -22,8 +22,11 @@ def cross_correlation(y_true, y_pred):
     Y_stddev = K.std(Y, axis=[1,2])
     X_mean = K.mean(X, axis=[1,2])
     Y_mean = K.mean(Y, axis=[1,2])
+    X_mean = K.expand_dims(K.expand_dims(X_mean, 1), 1)
+    Y_mean = K.expand_dims(K.expand_dims(Y_mean, 1), 1)
 
-    denom = K.tf.multiply(X_stddev,Y_stddev)
+    denom = K.tf.multiply(X_stddev, Y_stddev)
+    denom = K.expand_dims(denom, 1)
 
     return K.mean(K.dot(X-X_mean, Y-Y_mean),axis=[1,2]) / denom
 
