@@ -24,7 +24,7 @@ def read(video_folders, desired_labels = [Labels.FIXATION]):
 
     for i, folder in enumerate(video_folders):
         video_data = defaultdict(list)
-        with open(folder + "/etg_samples.txt") as f:
+        with open(str(folder) + "/etg_samples.txt") as f:
             eye_data = csv.reader(f, delimiter=' ', dialect="unix")
             next(eye_data) # skip csv header
             for row in eye_data:
