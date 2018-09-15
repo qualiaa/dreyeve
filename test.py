@@ -22,10 +22,10 @@ def test(filename):
 
     # load model
     print("Loading model...")
-    model = network.model(weights_file=filename)
+    model = network.predict_model(weights_file=filename)
     opts = tf.RunOptions(report_tensor_allocations_upon_oom=True)
     model.compile(optimizer='adam',loss=settings.loss(),
-            metrics=["mse",cross_correlation,kl_divergence],
+            metrics=["mse", cross_correlation, kl_divergence],
             options=opts)
 
     # load data
@@ -38,7 +38,8 @@ def test(filename):
 
     test_examples = KerasSequenceWrapper(DreyeveExamples,
             c.BATCH_SIZE,
-            test_folders)
+            test_folders,
+            train=False)
 
     # evaluate data
     results = model.evaluate_generator(test_examples,
