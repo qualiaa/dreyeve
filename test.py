@@ -8,8 +8,8 @@ from glob import glob
 
 import numpy as np
 import tensorflow as tf
-from keras.callbacks import TerminateOnNaN, ModelCheckpoint, TensorBoard
 
+import settings
 import network
 import consts as c
 from utils.Examples import KerasSequenceWrapper
