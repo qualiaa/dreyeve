@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import shutil
-from glob import glob
 from pathlib import Path
 
 import numpy as np
@@ -32,7 +31,7 @@ def train():
     opts = tf.RunOptions(report_tensor_allocations_upon_oom=True)
     model.compile(optimizer='adam',loss=settings.loss(), options=opts)
 
-    video_folders = glob(c.DATA_DIR + "/[0-9][0-9]")
+    video_folders = list(Path(c.DATA_DIR).glob("[0-9][0-9]"))
 
     train_split = int(c.TRAIN_SPLIT * len(video_folders))
     validation_split = int(c.VALIDATION_SPLIT * train_split)
