@@ -46,12 +46,12 @@ def test(filename):
                         use_multiprocessing=c.USE_MULTIPROCESSING,
                         workers=c.WORKERS)
 
-
     # write to stdout
     print(settings.run_name() + ":",results)
 
     # write to csv
-    results_dict = {"run_name": settings.run_name()}.update(
+    results_dict = {"run_name": settings.run_name()}
+    results_dict.update(
             dict(zip(model.metrics_names, results))
         )
 
