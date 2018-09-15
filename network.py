@@ -77,7 +77,7 @@ def predict_model(weights_file):
     resized_output = coarse_inference(resized_input)
 
     last_frame = Input(shape=(3,448,448),dtype='float32',name="last_frame")
-    resized_output = K.expand_dims(resized_output,1)
+    resized_output = Reshape([1,]+resized_output.shape.as_list()[1:])(resized_output)
     resized_output = UpSampling2D(size=(4,4),data_format=data_format)(
             resized_output)
 
